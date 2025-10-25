@@ -57,3 +57,29 @@ This project is a Twitch extension that displays tasks from a Notion database as
 - **Streamer:** Add tasks to your streamer Notion database, and they will appear in the overlay.
 - **Viewers:** Can submit tasks through the extension, which will be added to the viewer Notion database after moderator approval.
 - **Moderators:** Can approve or reject viewer-submitted tasks.
+
+## Local UI Testing
+
+To test the frontend UI (`code.html`) locally without connecting to the live Twitch API, you can use the provided mock servers.
+
+1.  **Install development dependencies:**
+    If you haven't already, install the required packages for the mock server:
+    ```bash
+    npm install
+    ```
+
+2.  **Start the Mock EBS Server:**
+    In your terminal, run the following command to start the mock backend server:
+    ```bash
+    node mock-ebs.js
+    ```
+    This will start a server on `http://localhost:8082` that provides sample task data.
+
+3.  **Open the Frontend in a Browser:**
+    Open the `code.html` file directly in your web browser, but add the `?local=true` query parameter to the end of the file path in the address bar.
+
+    For example:
+    `file:///path/to/your/project/code.html?local=true`
+
+4.  **Verify the UI:**
+    The page should now load and display the mock tasks defined in `mock-ebs.js`. You can now modify the `mockTasks` object in `mock-ebs.js` to test various UI states.

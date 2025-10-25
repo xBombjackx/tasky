@@ -1,0 +1,25 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "This project is a Twitch extension that displays tasks from a Notion database as an overlay on a livestream. It allows viewers to see the streamer's current tasks and even submit their own tasks for approval.",
+  "main": "ebs.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xBombjackx/tasky.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/xBombjackx/tasky/issues"
+  },
+  "homepage": "https://github.com/xBombjackx/tasky#readme",
+  "devDependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0"
+  }
+}

@@ -7,7 +7,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
 <link rel="stylesheet" href="styles.css">
-<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+<script>
+      const urlParams = new URLSearchParams(window.location.search);
+      // We'll define the EBS_URL globally based on the 'local' param.
+      let EBS_URL;
+
+      if (urlParams.get('local') === 'true') {
+        // For local testing, use the mock EBS and mock Twitch helper
+        document.write('<script src="mock-twitch-ext.js"><\/script>');
+        EBS_URL = "http://localhost:8082";
+      } else {
+        // For production/Twitch sandbox, use the real helper and EBS
+        document.write('<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"><\/script>');
+        EBS_URL = "https://yummy-badgers-dream.loca.lt";
+      }
+    </script>
 <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -81,9 +95,6 @@
 
       let authToken = null;
       let userId = null;
-
-      // TODO: Replace with your EBS URL
-      const EBS_URL = "https://yummy-badgers-dream.loca.lt";
 
       twitch.onAuthorized(async (auth) => {
         console.log("Twitch authorization successful!");

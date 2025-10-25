@@ -73,7 +73,7 @@
 </div>
 <div>
 <h3 class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3">Viewer Tasks</h3>
-<div id="viewer-tasks" class="flex flex-col max-h-[28rem] overflow-y-auto space-y-1 pr-1">
+<div id="viewer-tasks" class="flex flex-col max-h-[20rem] overflow-y-auto space-y-1 pr-1">
 <!-- Viewer tasks will be dynamically inserted here -->
 </div>
 </div>
@@ -196,15 +196,19 @@
           tasks.forEach(task => {
               const el = document.createElement("div");
               if (task.is_vip) {
-                el.className = "vip-task flex items-center gap-4 p-2 group bg-vip-bg rounded-lg";
+                el = document.createElement("label");
+                el.htmlFor = `viewer-task-${task.id}`;
+                el.className = "vip-task flex items-center gap-4 p-2 group bg-vip-bg rounded-lg cursor-pointer";
                 el.innerHTML = `
-                    <div class="absolute top-0 left-0 h-full w-full bg-vip-glow opacity-0 group-hover:opacity-10 transition-opacity duration-300 rounded-lg"></div>
+                  <div class="absolute top-0 left-0 h-full w-full bg-vip-glow opacity-0 group-hover:opacity-10 transition-opacity duration-300 rounded-lg"></div>
+                  <div class="flex-shrink-0">
                     <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
-                    <div class="flex flex-col justify-center flex-1">
-                        <label class="text-base font-bold leading-normal text-vip-glow cursor-pointer" for="viewer-task-${task.id}">${task.title}</label>
-                        <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
-                    </div>
-                    <span class="material-symbols-outlined text-3xl text-vip-glow">workspace_premium</span>
+                  </div>
+                  <div class="flex flex-col justify-center flex-1">
+                      <span class="text-base font-bold leading-normal text-vip-glow">${task.title}</span>
+                      <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
+                  </div>
+                  <span class="material-symbols-outlined text-3xl text-vip-glow">workspace_premium</span>
                 `;
               } else if (task.is_subscriber) {
                 el.className = "flex items-center gap-4 py-2 px-2 group";

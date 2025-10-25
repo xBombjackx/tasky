@@ -194,7 +194,7 @@
             return 0;
           });
           tasks.forEach(task => {
-              const el = document.createElement("div");
+              var el = document.createElement("div");
               if (task.is_vip) {
                 el = document.createElement("label");
                 el.htmlFor = `viewer-task-${task.id}`;

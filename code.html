@@ -58,10 +58,10 @@
 <div class="flex flex-col gap-2">
 <div class="flex justify-between items-baseline">
 <p class="text-base font-bold leading-normal text-text-light">Community Focus</p>
-<p class="text-sm font-medium leading-normal text-text-muted">3/4</p>
+<p class="text-sm font-medium leading-normal text-text-muted" id="task-counter">0/0</p>
 </div>
 <div class="h-2.5 w-full bg-black/20 rounded-full overflow-hidden">
-<div class="h-full bg-primary rounded-full" style="width: 75%;"></div>
+<div class="h-full bg-primary rounded-full" id="task-progress-bar" style="width: 0%;"></div>
 </div>
 </div>
 <div class="h-px bg-border-color/50"></div>
@@ -120,11 +120,29 @@
 
           const data = await response.json();
 
+          updateTaskCounter(data.streamerTasks, data.viewerTasks);
           renderStreamerTasks(data.streamerTasks);
           renderViewerTasks(data.viewerTasks);
 
         } catch (error) {
           console.error("Error fetching tasks:", error);
+        }
+      }
+
+      function updateTaskCounter(streamerTasks, viewerTasks) {
+        const allTasks = [...streamerTasks, ...viewerTasks];
+        const completedTasks = allTasks.filter(task => task.completed).length;
+        const totalTasks = allTasks.length;
+
+        const counterEl = document.getElementById("task-counter");
+        const progressBarEl = document.getElementById("task-progress-bar");
+
+        if (totalTasks > 0) {
+          counterEl.textContent = `${completedTasks}/${totalTasks}`;
+          progressBarEl.style.width = `${(completedTasks / totalTasks) * 100}%`;
+        } else {
+          counterEl.textContent = "0/0";
+          progressBarEl.style.width = "0%";
         }
       }
 
@@ -153,7 +171,15 @@
           }
           tasks.forEach(task => {
               const el = document.createElement("div");
-              el.className = "flex items-center gap-4 py-3 px-2 group";
+              let taskClasses = "flex items-center gap-4 py-3 px-2 group rounded-lg transition-all duration-200";
+              if (task.is_vip) {
+                  taskClasses += " vip";
+              }
+              if (task.is_subscriber) {
+                  taskClasses += " subscriber";
+              }
+              el.className = taskClasses;
+
               el.innerHTML = `
                   <input type="checkbox" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
                   <div class="flex flex-col justify-center flex-1">

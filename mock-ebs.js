@@ -8,12 +8,13 @@ app.use(cors());
 
 const mockTasks = {
   streamerTasks: [
-    { id: 'st1', title: 'Finish the main story quest' },
-    { id: 'st2', title: 'Defeat the secret boss' },
+    { id: 'st1', title: 'Finish the main story quest', completed: true },
+    { id: 'st2', title: 'Defeat the secret boss', completed: false },
   ],
   viewerTasks: [
-    { id: 'vt1', title: 'Use only a pistol for a round', submitter: 'viewer123' },
-    { id: 'vt2', title: 'Do a barrel roll!', submitter: 'anotherViewer' },
+    { id: 'vt1', title: 'Use only a pistol for a round', submitter: 'viewer123', completed: false, is_vip: true, is_subscriber: false },
+    { id: 'vt2', title: 'Do a barrel roll!', submitter: 'anotherViewer', completed: true, is_vip: false, is_subscriber: true },
+    { id: 'vt3', title: 'Get a triple kill', submitter: 'pro_gamer', completed: false, is_vip: false, is_subscriber: true },
   ],
 };
 

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Twitch Extension - Task Overlay</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        @layer utilities {
+          @keyframes shimmer {
+            0% { background-position: -400px 0; }
+            100% { background-position: 400px 0; }
+          }
+          @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 12px 2px rgba(246, 213, 92, 0.4); }
+            50% { box-shadow: 0 0 20px 6px rgba(246, 213, 92, 0.6); }
+          }
+          @keyframes text-shine {
+            0% { color: #f6d55c; }
+            50% { color: #fff; }
+            100% { color: #f6d55c; }
+          }
+          .vip-task {
+            position: relative;
+            overflow: hidden;
+            border: 2px solid transparent;
+            animation: pulse-glow 3s infinite ease-in-out;
+          }
+          .vip-task::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(110deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0) 60%);
+            animation: shimmer 4s infinite linear;
+            transform: skewX(-25deg);
+            pointer-events: none;
+          }
+          .vip-task .vip-text {
+            animation: text-shine 5s infinite ease-in-out;
+          }
+        }
+    </style>
+<style>
+        body {
+            background-image: url('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxISEhUSEhIVFRUVFRUVFRUVFRUVFRUVFRUWFhUVFRUYHSggGBolHRUVITEhJSkrLi4uFx8zODMtNygtLisBCgoKDg0OFxAQGC0fHR0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLf/AABEIALcBEwMBIgACEQEDEQH/xAAZAAEBAQEBAQAAAAAAAAAAAAABAAIDBAf/xAApEAEBAAIBAgYCAgMBAQEAAAABEQACITFBUWEQcYGRobHB0eHwEpHh/8QAGQEBAQEBAQEAAAAAAAAAAAAAAAECAwQF/8QAGhEBAQEBAQEBAAAAAAAAAAAAAAERAhIhMf/aAAAAAwDAQACEQMRAD8A+zSAUkApJBSSClIBQQCkEApIBSQCkgFBAKQQUkApBBSQCgAFpAKSQGkgFJIKSAUkApJBSSDGkgFJAKSIKSAUkgpIBQQCkEFAAKQQUkApJBSSAUkgpIY0gFxCSCEkAhJAISQCEkEIJBCEAhJBCSAQkgFJIKSIaSAUkApJAaSAUkApIBSSDGkgFJIKSAUkQGkgFJIKSAUkApIBQQCgAFpBCEAhJBCSAQkgEJIBCEAhJAISQCEkApIY0gFJIKSAUkApJBSSDGkgFJIKSAUkgFJIKSAUkQGkgFJIKSAUkApIBQQCgAFJBCEAhJBCSAQkgEJIBCSAQhAIQCEkAhJAaSAUkApJBSSAUkgpJBjSAUkApIBSSAUkApIBSRDSAUkApIBSSAUkApIBQQCgAFJBCEAhJBCSAQkgEIQCEIBCEAhJAISQGkgFJIKSAUkApJBSSDGkgFJIKSAUkApIBSSAUkQGkgFJIKSAUkApIBQQCgAFpBCSAQhAIQgEIQCEkAhCAQhAIQgEJIaSAUkApJBSSAUkgpJBjSAUkApIBSSAUkgFJIKSIaSAUkApIBSSAUkApIBQQCgAFpBCEAhCAQhAIQgEIQCEIBCEAhCAQkgFJIKSAUkApJBSSAUkgFJIMaSAUkApIBSSAUkgFJIKSIaSAUkApIBSSAUkApIBQQCgAFpBCEAhCAQhAIQgEIQCEIBCEAhJBCSA0kApJBSSAUkgpJBSSDGkgFJIKSAUkApIBSSAUkQ0gFJIKSAUkApIBSSAUgAoABSQQhAIQgEIQCEIBCSAQhAIQgEIQCEkFJIKSAUkApJBSSAUkgpJBjSAUkApIBSSAUkgFJIKSIaSAUkApIBSSAUkApABQACkgEIQCEIBCEAhCAQhAIQgEIQCEkAhJBSSAUkgpIBSSAUkgpJBjSAUkApIBSSAUkgFJIKSIaSAUkApIBSSAUkApABQACkgEIQCEIBCEAhCAQhAIQgEIQCEkEIQGkgFJIKSAUkApJBSSDGkgFJIKSAUkApIBSSAUkQ0gFJIKSAUkApIBSSAUgAoABSQQhAIQgEIQCEIBCEAhCAQhAIQgEIQGkgFJIKSAUkApJBSSAUkgxpAKSAUkApIBSSAUkgpJBDSQCkgFJIKSAUkApIBQACkgEIQCEIBCEAhCAQhAIQgEIQCEkEIQGkgFJIKSAUkApJBSSDGkgFJIKSAUkApIBSSAUkQ0gFJIKSAUkApIBSSAUgAoABSQQhAIQgEIQCEIBCEAhCAQhAIQgEJIBSQCkgFJIKSAUkApJBSSDGkgFJIKSAUkApIBSSAUkQ0gFJIKSAUkApIBSSAUgAoABSQQhAIQgEIQCEIBCEAhCAQhAIQgEJD/9k=');
+            background-size: cover;
+            background-position: center;
+        }
+        input[type="checkbox"]:checked+p {
+            text-decoration: line-through;
+            color: #79c2d0;
+        }
+        input[type="checkbox"]:checked+div>label {
+            text-decoration: line-through;
+            color: #79c2d0;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#53a8b6",
+                        "background-light": "#f6f5f8",
+                        "background-dark": "#3a4f6a",
+                        "text-light": "#bbe4e9",
+                        "text-muted": "#79c2d0",
+                        "border-color": "#5585b5",
+                        "vip-glow": "#f6d55c",
+                        "vip-bg": "rgba(246, 213, 92, 0.1)",
+                        "subscriber": "#d68fd6",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.75rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="relative min-h-screen p-4 sm:p-6 lg:p-8 flex items-start justify-end">
+<div class="w-full max-w-sm bg-background-dark/80 dark:bg-background-dark/80 backdrop-blur-xl rounded-xl border border-border-color/50 shadow-2xl shadow-primary/10 flex flex-col gap-5 text-text-light p-5">
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-baseline">
+<p class="text-base font-bold leading-normal text-text-light">Community Focus</p>
+<p class="text-sm font-medium leading-normal text-text-muted">3/4</p>
+</div>
+<div class="h-2.5 w-full bg-black/20 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 75%;"></div>
+</div>
+</div>
+<div class="h-px bg-border-color/50"></div>
+<div>
+<h3 class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3">Streamer Tasks</h3>
+<div class="flex flex-col">
+<label class="flex items-center gap-x-4 py-3 cursor-pointer group">
+<input checked="" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" type="checkbox"/>
+<p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">Reach 10 new subscribers</p>
+</label>
+<label class="flex items-center gap-x-4 py-3 cursor-pointer group">
+<input class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" type="checkbox"/>
+<p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">Finish the main quest</p>
+</label>
+<label class="flex items-center gap-x-4 py-3 cursor-pointer group">
+<input class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" type="checkbox"/>
+<p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">Say hello to a new chatter</p>
+</label>
+</div>
+</div>
+<div>
+<h3 class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3">Viewer Tasks</h3>
+<div class="flex flex-col max-h-[28rem] overflow-y-auto space-y-1 pr-1">
+<div class="vip-task flex items-center gap-4 p-4 group bg-vip-bg rounded-lg my-1">
+<input class="h-6 w-6 shrink-0 rounded-lg border-vip-glow border-2 bg-transparent text-vip-glow checked:bg-vip-glow checked:border-vip-glow focus:ring-2 focus:ring-vip-glow/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-vip-1" type="checkbox"/>
+<div class="flex flex-col justify-center flex-1">
+<label class="vip-text text-base font-bold leading-normal text-vip-glow cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-vip-1">Invert mouse controls</label>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="material-symbols-outlined text-sm text-vip-glow -ml-0.5">workspace_premium</span>
+<p class="text-sm font-medium leading-normal text-vip-glow">by @MouseMaster <span class="font-normal text-text-muted">(VIP)</span></p>
+</div>
+</div>
+</div>
+<div class="vip-task flex items-center gap-4 p-4 group bg-vip-bg rounded-lg my-1">
+<input checked="" class="h-6 w-6 shrink-0 rounded-lg border-vip-glow border-2 bg-transparent text-vip-glow checked:bg-vip-glow checked:border-vip-glow focus:ring-2 focus:ring-vip-glow/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-vip-2" type="checkbox"/>
+<div class="flex flex-col justify-center flex-1">
+<label class="vip-text text-base font-bold leading-normal text-vip-glow cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-vip-2">Beat a boss with no armor</label>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="material-symbols-outlined text-sm text-vip-glow -ml-0.5">workspace_premium</span>
+<p class="text-sm font-medium leading-normal text-vip-glow">by @ChallengeAccepted <span class="font-normal text-text-muted">(VIP)</span></p>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4 py-3 px-2 group">
+<input class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-sub-1" type="checkbox"/>
+<div class="flex flex-col justify-center flex-1">
+<label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-sub-1">Play with one hand</label>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm text-subscriber">star</span>
+<p class="text-sm font-normal leading-normal text-text-muted">by @ProGamer123</p>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4 py-3 px-2 group">
+<input checked="" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-sub-2" type="checkbox"/>
+<div class="flex flex-col justify-center flex-1">
+<label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-sub-2">Use only a pistol for 5 mins</label>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm text-subscriber">star</span>
+<p class="text-sm font-normal leading-normal text-text-muted">by @PixelWizard</p>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4 py-3 px-2 group">
+<input class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-sub-3" type="checkbox"/>
+<div class="flex flex-col justify-center flex-1">
+<label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-sub-3">Drop your best item</label>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm text-subscriber">star</span>
+<p class="text-sm font-normal leading-normal text-text-muted">by @ChaosAgent</p>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4 py-3 px-2 group">
+<input class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-1" type="checkbox"/>
+<div class="flex flex-col justify-center flex-1">
+<label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-1">Do a barrel roll!</label>
+<p class="text-sm font-normal leading-normal text-text-muted">by @xGamerPro</p>
+</div>
+</div>
+<div class="flex items-center gap-4 py-3 px-2 group">
+<input class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-3" type="checkbox"/>
+<div class="flex flex-col justify-center flex-1">
+<label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-3">Tell a dad joke</label>
+<p class="text-sm font-normal leading-normal text-text-muted">by @ChatterQueen</p>
+</div>
+</div>
+<div class="flex items-center gap-4 py-3 px-2 group">
+<input checked="" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-6" type="checkbox"/>
+<div class="flex flex-col justify-center flex-1">
+<label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-6">Sing a song</label>
+<p class="text-sm font-normal leading-normal text-text-muted">by @MusicLover</p>
+</div>
+</div>
+<div class="flex items-center gap-4 py-3 px-2 group">
+<input class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-7" type="checkbox"/>
+<div class="flex flex-col justify-center flex-1">
+<label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-7">Pet the dog in-game</label>
+<p class="text-sm font-normal leading-normal text-text-muted">by @AnimalFriend</p>
+</div>
+</div>
+<div class="flex items-center gap-4 py-3 px-2 group">
+<input class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-10" type="checkbox"/>
+<div class="flex flex-col justify-center flex-1">
+<label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-10">Say "meow" after every sentence</label>
+<p class="text-sm font-normal leading-normal text-text-muted">by @CatPerson</p>
+</div>
+</div>
+</div>
+</div>
+<div>
+<h3 class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3">Bonus Goals</h3>
+<div class="flex flex-col items-center justify-center py-6 px-4 text-center bg-black/20 rounded-xl">
+<span class="material-symbols-outlined text-4xl text-text-muted">
+                    checklist
+                    </span>
+<p class="text-sm font-medium text-text-muted mt-1">No bonus goals yet.</p>
+</div>
+</div>
+</div>
+</div>
+</body></html>

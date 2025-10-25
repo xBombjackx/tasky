@@ -1,65 +1,97 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Notion Task Extension</title>
-    <!-- The Twitch Extension Helper Library -->
-    <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
-
-    <style>
-      /* Basic styling for visibility */
-      body {
-        font-family: sans-serif;
-        background-color: transparent;
-        color: white;
-        padding: 20px;
-      }
-      #app {
-        background-color: rgba(10, 10, 20, 0.8);
-        padding: 15px;
-        border-radius: 8px;
-      }
-      .task {
-        padding: 5px;
-        border-bottom: 1px solid #444;
-      }
-    </style>
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Twitch Extension - Task Overlay</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<link rel="stylesheet" href="styles.css">
+<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#53a8b6",
+                        "background-light": "#f6f5f8",
+                        "background-dark": "#3a4f6a",
+                        "text-light": "#bbe4e9",
+                        "text-muted": "#79c2d0",
+                        "border-color": "#5585b5",
+                        "vip-glow": "#f6d55c",
+                        "vip-bg": "rgba(246, 213, 92, 0.1)",
+                        "subscriber": "#d68fd6",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.75rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
   </head>
-  <body>
-    <div id="app">
-      <h2>Live Tasks</h2>
-      <div id="streamer-tasks"></div>
-      <div id="viewer-tasks"></div>
-      <div id="auth-status">Connecting to Twitch...</div>
-    </div>
-
-    <script>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="relative min-h-screen p-4 sm:p-6 lg:p-8 flex items-start justify-end">
+<div class="w-full max-w-sm bg-background-dark/80 dark:bg-background-dark/80 backdrop-blur-xl rounded-xl border border-border-color/50 shadow-2xl shadow-primary/10 flex flex-col gap-5 text-text-light p-5">
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-baseline">
+<p class="text-base font-bold leading-normal text-text-light">Community Focus</p>
+<p class="text-sm font-medium leading-normal text-text-muted">3/4</p>
+</div>
+<div class="h-2.5 w-full bg-black/20 rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 75%;"></div>
+</div>
+</div>
+<div class="h-px bg-border-color/50"></div>
+<div>
+<h3 class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3">Streamer Tasks</h3>
+<div id="streamer-tasks" class="flex flex-col">
+<!-- Streamer tasks will be dynamically inserted here -->
+</div>
+</div>
+<div>
+<h3 class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3">Viewer Tasks</h3>
+<div id="viewer-tasks" class="flex flex-col max-h-[28rem] overflow-y-auto space-y-1 pr-1">
+<!-- Viewer tasks will be dynamically inserted here -->
+</div>
+</div>
+<div>
+<h3 class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3">Bonus Goals</h3>
+<div class="flex flex-col items-center justify-center py-6 px-4 text-center bg-black/20 rounded-xl">
+<span class="material-symbols-outlined text-4xl text-text-muted">
+                    checklist
+                    </span>
+<p class="text-sm font-medium text-text-muted mt-1">No bonus goals yet.</p>
+</div>
+</div>
+</div>
+</div>
+<script>
       const twitch = window.Twitch.ext;
-      const authStatusDiv = document.getElementById("auth-status");
       const streamerTasksDiv = document.getElementById("streamer-tasks");
+      const viewerTasksDiv = document.getElementById("viewer-tasks");
 
-      let authToken = null; // We will store the JWT here
-      let userId = null; // We will store the user's ID here
+      let authToken = null;
+      let userId = null;
 
-      // This is the URL of our EBS
+      // TODO: Replace with your EBS URL
       const EBS_URL = "https://yummy-badgers-dream.loca.lt";
-
-      // This function is called by Twitch when the extension is authorized
 
       twitch.onAuthorized(async (auth) => {
         console.log("Twitch authorization successful!");
-        authStatusDiv.textContent = `Authenticated as user: ${auth.userId}`;
-
-        // Save the token and user ID
         authToken = auth.token;
         userId = auth.userId;
-
-        // Now that we're authorized, we can fetch the tasks
         await fetchTasks();
       });
 
-      // This function fetches tasks from our backend
       async function fetchTasks() {
         if (!authToken) {
           console.error("Cannot fetch tasks, not authenticated yet.");
@@ -71,40 +103,59 @@
             method: "GET",
             headers: {
               "Content-Type": "application/json",
-              // We send our JWT with the request for verification
               Authorization: `Bearer ${authToken}`,
             },
           });
 
           const data = await response.json();
 
-          // Clear and render tasks
-          streamerTasksDiv.innerHTML = "<h3>Streamer Tasks</h3>";
-          data.streamerTasks.forEach((task) => {
-            const el = document.createElement("div");
-            el.className = "task";
-            el.textContent = `[ ] ${task.title}`;
-            streamerTasksDiv.appendChild(el);
-          });
+          renderStreamerTasks(data.streamerTasks);
+          renderViewerTasks(data.viewerTasks);
 
-          const viewerTasksDiv = document.getElementById("viewer-tasks");
-          viewerTasksDiv.innerHTML = "<h3>Viewer Tasks</h3>";
-          data.viewerTasks.forEach((task) => {
-            const el = document.createElement("div");
-            el.className = "task";
-            el.textContent = `[ ] ${task.title} (by ${task.submitter})`;
-            viewerTasksDiv.appendChild(el);
-          });
         } catch (error) {
           console.error("Error fetching tasks:", error);
-          authStatusDiv.textContent = "Error fetching tasks from backend.";
         }
       }
 
-      // Listen for context changes (e.g., light/dark mode)
+      function renderStreamerTasks(tasks) {
+        streamerTasksDiv.innerHTML = ""; // Clear existing tasks
+        if (tasks.length === 0) {
+            streamerTasksDiv.innerHTML = "<p>No streamer tasks yet.</p>";
+            return;
+        }
+        tasks.forEach(task => {
+            const el = document.createElement("label");
+            el.className = "flex items-center gap-x-4 py-3 cursor-pointer group";
+            el.innerHTML = `
+                <input type="checkbox" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? 'checked' : ''}/>
+                <p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">${task.title}</p>
+            `;
+            streamerTasksDiv.appendChild(el);
+        });
+      }
+
+      function renderViewerTasks(tasks) {
+          viewerTasksDiv.innerHTML = ""; // Clear existing tasks
+          if (tasks.length === 0) {
+              viewerTasksDiv.innerHTML = "<p>No viewer tasks yet.</p>";
+              return;
+          }
+          tasks.forEach(task => {
+              const el = document.createElement("div");
+              el.className = "flex items-center gap-4 py-3 px-2 group";
+              el.innerHTML = `
+                  <input type="checkbox" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
+                  <div class="flex flex-col justify-center flex-1">
+                      <label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-${task.id}">${task.title}</label>
+                      <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
+                  </div>
+              `;
+              viewerTasksDiv.appendChild(el);
+          });
+      }
+
       twitch.onContext((context, changed) => {
         // console.log('Context changed:', context);
       });
     </script>
-  </body>
-</html>
+</body></html>

@@ -129,6 +129,23 @@
         }
       }
 
+      function updateCounterFromDOM() {
+        const allTasks = document.querySelectorAll('#streamer-tasks input[type="checkbox"], #viewer-tasks input[type="checkbox"]');
+        const completedTasks = document.querySelectorAll('#streamer-tasks input:checked, #viewer-tasks input:checked');
+        const total = allTasks.length;
+        const completed = completedTasks.length;
+        const counterEl = document.getElementById("task-counter");
+        const progressBarEl = document.getElementById("task-progress-bar");
+
+        if (total > 0) {
+          counterEl.textContent = `${completed}/${total}`;
+          progressBarEl.style.width = `${(completed / total) * 100}%`;
+        } else {
+          counterEl.textContent = "0/0";
+          progressBarEl.style.width = "0%";
+        }
+      }
+
       function updateTaskCounter(streamerTasks, viewerTasks) {
         const allTasks = [...streamerTasks, ...viewerTasks];
         const completedTasks = allTasks.filter(task => task.completed).length;
@@ -156,7 +173,7 @@
             const el = document.createElement("label");
             el.className = "flex items-center gap-x-4 py-3 cursor-pointer group";
             el.innerHTML = `
-                <input type="checkbox" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? 'checked' : ''}/>
+                <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? 'checked' : ''}/>
                 <p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">${task.title}</p>
             `;
             streamerTasksDiv.appendChild(el);
@@ -169,24 +186,46 @@
               viewerTasksDiv.innerHTML = "<p>No viewer tasks yet.</p>";
               return;
           }
+          tasks.sort((a, b) => {
+            if (a.is_vip && !b.is_vip) return -1;
+            if (!a.is_vip && b.is_vip) return 1;
+            if (a.is_subscriber && !b.is_subscriber) return -1;
+            if (!a.is_subscriber && b.is_subscriber) return 1;
+            return 0;
+          });
           tasks.forEach(task => {
               const el = document.createElement("div");
-              let taskClasses = "flex items-center gap-4 py-3 px-2 group rounded-lg transition-all duration-200";
               if (task.is_vip) {
-                  taskClasses += " vip";
+                el.className = "vip-task flex items-center gap-4 p-2 group bg-vip-bg rounded-lg";
+                el.innerHTML = `
+                    <div class="absolute top-0 left-0 h-full w-full bg-vip-glow opacity-0 group-hover:opacity-10 transition-opacity duration-300 rounded-lg"></div>
+                    <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
+                    <div class="flex flex-col justify-center flex-1">
+                        <label class="text-base font-bold leading-normal text-vip-glow cursor-pointer" for="viewer-task-${task.id}">${task.title}</label>
+                        <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
+                    </div>
+                    <span class="material-symbols-outlined text-3xl text-vip-glow">workspace_premium</span>
+                `;
+              } else if (task.is_subscriber) {
+                el.className = "flex items-center gap-4 py-2 px-2 group";
+                el.innerHTML = `
+                    <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
+                    <div class="flex flex-col justify-center flex-1">
+                        <label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-${task.id}">${task.title}</label>
+                        <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
+                    </div>
+                    <span class="material-symbols-outlined text-2xl text-subscriber">star</span>
+                `;
+              } else {
+                el.className = "flex items-center gap-4 py-2 px-2 group";
+                el.innerHTML = `
+                    <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
+                    <div class="flex flex-col justify-center flex-1">
+                        <label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-${task.id}">${task.title}</label>
+                        <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
+                    </div>
+                `;
               }
-              if (task.is_subscriber) {
-                  taskClasses += " subscriber";
-              }
-              el.className = taskClasses;
-
-              el.innerHTML = `
-                  <input type="checkbox" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
-                  <div class="flex flex-col justify-center flex-1">
-                      <label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-${task.id}">${task.title}</label>
-                      <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
-                  </div>
-              `;
               viewerTasksDiv.appendChild(el);
           });
       }

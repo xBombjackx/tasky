@@ -4,7 +4,7 @@
 
 This document outlines the design of the Twitch Notion Task Overlay extension. The system is composed of three main components:
 
-1.  **Frontend**: An HTML/JavaScript page (`video_overlay.html`) that is displayed on the Twitch livestream.
+1.  **Frontend**: An HTML/JavaScript page (`code.html`) that is displayed on the Twitch livestream.
 2.  **Backend (EBS)**: An Extension Backend Service (`ebs.js`) that handles business logic, communicates with the Notion API, and verifies Twitch JWTs.
 3.  **Notion Databases**: Two databases that store tasks—one for the streamer and one for viewer submissions.
 
@@ -12,7 +12,7 @@ The frontend communicates with the EBS, which in turn communicates with the Noti
 
 ## 2. Frontend
 
-The frontend is a single HTML file (`video_overlay.html`) that contains the following:
+The frontend is a single HTML file (`code.html`) that contains the following:
 
 -   **HTML Structure**: A basic structure to display the tasks.
 -   **CSS Styling**: Basic styling to make the overlay readable.

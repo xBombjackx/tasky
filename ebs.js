@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const { Client } = require("@notionhq/client");
 const jwt = require("jsonwebtoken");
+const fetch = require("node-fetch");
 
 // --- Local Dependencies ---
 const configStore = require("./config/configStore");
@@ -148,8 +149,6 @@ app.post("/setup", verifyTwitchJWT, async (req, res) => {
 app.use("/setup", verifyTwitchJWT, setupRoutes);
 
 // --- API Endpoints for the Extension ---
-
-const fetch = require("node-fetch");
 
 // GET /config - Fetches the extension's configuration
 app.get("/config", verifyTwitchJWT, async (req, res) => {

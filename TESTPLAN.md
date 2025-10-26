@@ -54,7 +54,7 @@ This database holds tasks submitted by viewers.
 | Property Name     | Type        | Description                                                                                                      |
 | ----------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- |
 | `Task`            | `Title`     | The name or description of the task. This is the main property.                                                  |
-| `Suggested by`    | `Rich text` | The Twitch username or opaque id of the viewer who submitted the task.                                           |
+| `Suggested by`    | `Rich text` | The Twitch username or opaque ID of the viewer who submitted the task.                                           |
 | `Role`            | `Select`    | The role of the submitter. Options: `Viewer`, `VIP`, `SubscriberT1`, `SubscriberT2`, `SubscriberT3`,`Moderator`. |
 | `Status`          | `Status`    | The status of the suggestion. Options: `Pending`, `Approved`, `Rejected`.                                        |
 | `Approval Status` | `Select`    | Moderation state used by the EBS migration/approval workflow. Options: `Pending`, `Approved`, `Rejected`.        |
@@ -62,6 +62,9 @@ This database holds tasks submitted by viewers.
 
 **Note:** Ensure the property names in your Notion databases match exactly what
 is listed above, as the integration will use these names to read and write data.
+The `Role` property's `Select` options must be capitalized exactly as shown.
+**Important**: The `State` property on the Streamer database is intentionally
+named `State` to match the current backend code.
 
 ## Running the Servers
 
@@ -170,6 +173,22 @@ curl -X PUT "http://localhost:8081/tasks/<PAGE_ID>/approve" -H "Authorization: B
 
 If the task title contains prohibited content, the server will auto-reject and
 archive it instead of approving it; the response will indicate the rejection.
+
+### Example: Testing content moderation
+
+1.  **Test submission rejection**: Use the `POST /tasks` endpoint (or the
+    extension UI) to submit a task with a title containing a prohibited phrase.
+    The request should fail with an HTTP 400 error.
+
+2.  **Test approval rejection**: a. Manually create a task in your viewer Notion
+    database with a prohibited title. b. Get the page ID for that task. c. Use
+    the `PUT /tasks/<PAGE_ID>/approve` endpoint with a moderator JWT. d. The
+    request should succeed, but the server response and the Notion page should
+    indicate that the task was `Rejected` instead of `Approved`.
+
+This two-step test verifies that the content filter works for both new
+submissions and for tasks that might have been added to Notion before the filter
+was in place.
 
 ## Moderation and content filtering
 

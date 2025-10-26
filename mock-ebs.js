@@ -145,6 +145,25 @@ app.post("/tasks", (req, res) => {
   res.status(201).json(newTask);
 });
 
+app.put("/tasks/me/complete", (req, res) => {
+  const { completed } = req.body;
+  console.log(
+    `Mock EBS: Received request for PUT /tasks/me/complete with completed: ${completed}`,
+  );
+  // In a real app, you'd find the task for the user from the JWT and update it.
+  // For the mock, we can just log it and return success.
+  res.status(200).json({ success: true, completed: completed });
+});
+
+app.put("/tasks/:pageId/complete", (req, res) => {
+  const { pageId } = req.params;
+  const { completed } = req.body;
+  console.log(
+    `Mock EBS: Received request for PUT /tasks/${pageId}/complete with completed: ${completed}`,
+  );
+  res.status(200).json({ success: true, pageId: pageId, completed: completed });
+});
+
 app.listen(PORT, () => {
   console.log(`Mock EBS server running on http://localhost:${PORT}`);
 });

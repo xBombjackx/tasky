@@ -110,7 +110,8 @@ app.post("/setup", verifyTwitchJWT, async (req, res) => {
     }
 
     // Save database IDs to config
-    await configManager.updateDatabases(streamerDbId, viewerDbId);
+    // This is a placeholder for the actual Twitch Configuration Service call
+    console.log(`Saving to Twitch Config Service: streamerDbId=${streamerDbId}, viewerDbId=${viewerDbId}`);
 
     res.json({
       message: "Setup completed successfully",
@@ -133,6 +134,46 @@ app.use("/setup", verifyTwitchJWT, setupRoutes);
 
 // --- API Endpoints for the Extension ---
 
+const fetch = require("node-fetch");
+
+// GET /config - Fetches the extension's configuration
+app.get("/config", verifyTwitchJWT, async (req, res) => {
+  const { channel_id: channelId, user_id: userId } = req.twitch;
+  const url = `https://api.twitch.tv/extensions/${process.env.TWITCH_CLIENT_ID}/configurations/segments/broadcaster`;
+
+  const token = jwt.sign(
+    {
+      exp: Math.floor(Date.now() / 1000) + 60,
+      user_id: userId,
+      role: "external",
+      channel_id: channelId,
+    },
+    Buffer.from(process.env.TWITCH_EXTENSION_SECRET, "base64")
+  );
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Client-ID": process.env.TWITCH_CLIENT_ID,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const config = JSON.parse(data[0].content);
+      res.json(config);
+    } else {
+      res.status(response.status).json({ message: "Failed to fetch configuration." });
+    }
+  } catch (error) {
+    console.error("Error fetching configuration:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
 // GET /tasks - Fetches all active tasks
 // This endpoint is "public" in the sense that any viewer can see the tasks.
 app.get("/tasks", verifyTwitchJWT, async (req, res) => {
@@ -141,7 +182,20 @@ app.get("/tasks", verifyTwitchJWT, async (req, res) => {
     `[EBS] Received GET /tasks request from user: ${req.twitch.user_id} for channel: ${channelId}`,
   );
   try {
-    const tasks = await getTasksForOverlay(channelId);
+    const configResponse = await fetch(`http://localhost:${PORT}/config`, {
+      headers: {
+        Authorization: req.headers.authorization,
+      },
+    });
+
+    if (!configResponse.ok) {
+      throw new Error("Failed to fetch configuration for tasks.");
+    }
+
+    const config = await configResponse.json();
+    const { streamerDbId, viewerDbId } = config;
+
+    const tasks = await getTasksForOverlay(streamerDbId, viewerDbId);
     res.json(tasks);
   } catch (error) {
     console.error("[EBS] CRITICAL ERROR in /tasks route:", error);
@@ -152,6 +206,11 @@ app.get("/tasks", verifyTwitchJWT, async (req, res) => {
 // POST /tasks - A viewer submits a new task
 app.post("/tasks", verifyTwitchJWT, async (req, res) => {
   const { taskDescription } = req.body;
+
+  if (!taskDescription || taskDescription.trim().length === 0) {
+    return res.status(400).json({ message: "Task description cannot be empty." });
+  }
+
   const channelId = req.twitch.channel_id;
   // Use the opaque_user_id as the "username" to track who submitted it
   const submitterId = req.twitch.opaque_user_id;
@@ -160,7 +219,7 @@ app.post("/tasks", verifyTwitchJWT, async (req, res) => {
   );
 
   try {
-    await addViewerTask(channelId, submitterId, taskDescription);
+    await addViewerTask(submitterId, taskDescription.trim());
     res
       .status(201)
       .json({ message: "Task submitted successfully for approval!" });
@@ -223,7 +282,7 @@ async function getDataSourceId(databaseId) {
   }
 }
 
-async function findUserTask(username, approvalStatus) {
+async function findUserTask(opaque_user_id, approvalStatus) {
   const dataSourceId = await getDataSourceId(VIEWER_DATABASE_ID);
   if (!dataSourceId) return null;
   try {
@@ -231,7 +290,7 @@ async function findUserTask(username, approvalStatus) {
       data_source_id: dataSourceId,
       filter: {
         and: [
-          { property: "Submitter", rich_text: { equals: username } },
+          { property: "Suggested by", rich_text: { equals: opaque_user_id } },
           { property: "Approval Status", select: { equals: approvalStatus } },
         ],
       },
@@ -239,14 +298,14 @@ async function findUserTask(username, approvalStatus) {
     return response.results.length > 0 ? response.results[0] : null;
   } catch (error) {
     console.error(
-      `[NOTION] Error finding task for ${username}:`,
+      `[NOTION] Error finding task for ${opaque_user_id}:`,
       error.body || error,
     );
     return null;
   }
 }
 
-async function addViewerTask(username, taskDescription) {
+async function addViewerTask(opaque_user_id, taskDescription) {
   try {
     if (!VIEWER_DATABASE_ID) {
       throw new Error("Viewer database ID not found in environment variables.");
@@ -255,63 +314,59 @@ async function addViewerTask(username, taskDescription) {
       parent: { database_id: VIEWER_DATABASE_ID },
       properties: {
         Task: { title: [{ text: { content: taskDescription } }] },
-        "Suggested by": { rich_text: [{ text: { content: username } }] },
+        "Suggested by": { rich_text: [{ text: { content: opaque_user_id } }] },
         Status: { status: { name: "Pending" } },
         Completed: { checkbox: false },
         Role: { select: { name: "Viewer" } },
       },
     });
-    console.log(`[NOTION] Added task for ${username}: "${taskDescription}"`);
+    console.log(`[NOTION] Added task for ${opaque_user_id}: "${taskDescription}"`);
   } catch (error) {
     console.error("[NOTION] Error adding task:", error.body || error);
   }
 }
 
-async function approveViewerTask(username) {
-  const task = await findUserTask(username, "Pending");
+async function approveViewerTask(opaque_user_id) {
+  const task = await findUserTask(opaque_user_id, "Pending");
   if (task) {
     await notion.pages.update({
       page_id: task.id,
       properties: { "Approval Status": { select: { name: "Approved" } } },
     });
-    console.log(`[NOTION] Approved task for ${username}`);
-    return `Task for @${username} has been approved!`;
+    console.log(`[NOTION] Approved task for ${opaque_user_id}`);
+    return `Task for @${opaque_user_id} has been approved!`;
   }
-  return `No pending task found for @${username}.`;
+  return `No pending task found for @${opaque_user_id}.`;
 }
 
-async function rejectViewerTask(username) {
-  const task = await findUserTask(username, "Pending");
+async function rejectViewerTask(opaque_user_id) {
+  const task = await findUserTask(opaque_user_id, "Pending");
   if (task) {
     await notion.pages.update({ page_id: task.id, archived: true });
-    console.log(`[NOTION] Rejected (archived) task for ${username}`);
-    return `Task for @${username} has been rejected.`;
+    console.log(`[NOTION] Rejected (archived) task for ${opaque_user_id}`);
+    return `Task for @${opaque_user_id} has been rejected.`;
   }
-  return `No pending task found for @${username} to reject.`;
+  return `No pending task found for @${opaque_user_id} to reject.`;
 }
 
-async function updateViewerTaskStatus(username, isComplete) {
-  const task = await findUserTask(username, "Approved");
+async function updateViewerTaskStatus(opaque_user_id, isComplete) {
+  const task = await findUserTask(opaque_user_id, "Approved");
   if (task) {
     await notion.pages.update({
       page_id: task.id,
       properties: { Status: { checkbox: isComplete } },
     });
     const statusText = isComplete ? "completed" : "reset to active";
-    console.log(`[NOTION] Task for ${username} marked as ${statusText}`);
-    return `@${username}'s task has been marked as ${statusText}!`;
+    console.log(`[NOTION] Task for ${opaque_user_id} marked as ${statusText}`);
+    return `@${opaque_user_id}'s task has been marked as ${statusText}!`;
   }
-  return `@${username}, no active task found for you to update.`;
+  return `@${opaque_user_id}, no active task found for you to update.`;
 }
 
-async function getTasksForOverlay() {
+async function getTasksForOverlay(streamerDbId, viewerDbId) {
   try {
-    // Use environment variables directly if available
-    const streamerDbId = STREAMER_DATABASE_ID;
-    const viewerDbId = VIEWER_DATABASE_ID;
-
     if (!streamerDbId || !viewerDbId) {
-      throw new Error("Database IDs not found in environment variables.");
+      throw new Error("Database IDs not configured for this channel.");
     }
 
     const [streamerResponse, viewerResponse] = await Promise.all([
@@ -334,7 +389,7 @@ async function getTasksForOverlay() {
       id: page.id,
       type: "streamer",
       title: page.properties.Task?.title[0]?.plain_text || "Untitled Task",
-      state: page.properties.State?.status?.name || "Not started",
+      status: page.properties.Status?.status?.name || "Not started",
     }));
 
     const viewerTasks = viewerResponse.results.map((page) => ({

@@ -175,6 +175,10 @@
             },
           });
 
+          if (!response.ok) {
+            throw new Error(`Failed to fetch tasks: ${response.status} ${response.statusText}`);
+          }
+
           const data = await response.json();
 
           updateTaskCounter(data.streamerTasks, data.viewerTasks);
@@ -182,29 +186,12 @@
           renderViewerTasks(data.viewerTasks);
         } catch (error) {
           console.error("Error fetching tasks:", error);
+          const errorMessage = "<p class='text-text-muted'>Could not load tasks. Please try again later.</p>";
+          streamerTasksDiv.innerHTML = errorMessage;
+          viewerTasksDiv.innerHTML = errorMessage;
         }
       }
 
-      function updateCounterFromDOM() {
-        const allTasks = document.querySelectorAll(
-          '#streamer-tasks input[type="checkbox"], #viewer-tasks input[type="checkbox"]',
-        );
-        const completedTasks = document.querySelectorAll(
-          "#streamer-tasks input:checked, #viewer-tasks input:checked",
-        );
-        const total = allTasks.length;
-        const completed = completedTasks.length;
-        const counterEl = document.getElementById("task-counter");
-        const progressBarEl = document.getElementById("task-progress-bar");
-
-        if (total > 0) {
-          counterEl.textContent = `${completed}/${total}`;
-          progressBarEl.style.width = `${(completed / total) * 100}%`;
-        } else {
-          counterEl.textContent = "0/0";
-          progressBarEl.style.width = "0%";
-        }
-      }
 
       function updateTaskCounter(streamerTasks, viewerTasks) {
         const allTasks = [...streamerTasks, ...viewerTasks];
@@ -234,7 +221,7 @@
           el.className =
             "flex items-center gap-4 py-1.5 px-2 cursor-pointer group bg-black/20 rounded-lg";
           el.innerHTML = `
-                <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? "checked" : ""}/>
+                <input type="checkbox" onchange="fetchTasks()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? "checked" : ""}/>
                 <p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">${task.title}</p>
             `;
           streamerTasksDiv.appendChild(el);
@@ -301,7 +288,7 @@
           el.className = `relative flex items-center gap-4 py-1.5 px-2 group rounded-lg cursor-pointer ${containerClass}`;
           el.innerHTML = `
                 <div class="flex-shrink-0">
-                  <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? "checked" : ""}/>
+                  <input type="checkbox" onchange="fetchTasks()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? "checked" : ""}/>
                 </div>
                 <div class="flex flex-col justify-center flex-1">
                     <span class="text-base font-medium leading-normal ${titleClass} group-hover:text-primary transition-colors">${task.title}</span>

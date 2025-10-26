@@ -91,21 +91,24 @@ You will need two terminal sessions for local testing.
 ## Testing the Frontend
 
 1.  **Serve the frontend**: Since the frontend is a static `code.html` file, you
-    need a simple HTTP server to serve it to avoid CORS issues.
+    need a simple HTTP server to serve it. You can use the `http-server` package
+    via `npx`, which comes with Node.js.
 
     ```bash
-    python3 -m http.server
+    npx http-server -p 8080
     ```
 
     This will serve the files in the current directory on
-    `http://localhost:8000`.
+    `http://localhost:8080`. If it's your first time, `npx` will ask for
+    permission to download the package.
 
 2.  **Open the frontend in your browser**:
     - **For UI testing with mock data**:
-      `http://localhost:8000/code.html?local=true`
-    - **For Notion integration testing**: `http://localhost:8000/code.html`
+      `http://localhost:8080/code.html?local=true`
+    - **For Notion integration testing**:
+      `http://localhost:8080/code.html?local=true&ebs=notion`
 
-    _Note: For Notion integration testing, you will need a valid Twitch JWT,
-    which is typically only available when the extension is running on Twitch.
-    You can use the mock `twitch-ext.js` to provide a dummy JWT for local
-    testing._
+    _Note: The `local=true` parameter loads a mock Twitch helper
+    (`mock-twitch-ext.js`) that provides the necessary JWT for local testing.
+    The `ebs=notion` parameter tells the frontend to connect to your real Notion
+    EBS._

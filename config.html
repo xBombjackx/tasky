@@ -1,0 +1,275 @@
+<!doctype html>
+<html class="dark" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Tasky - Configuration</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="themes.css" />
+    <script>
+      const urlParams = new URLSearchParams(window.location.search);
+      let EBS_URL = "https://yummy-badgers-dream.loca.lt"; // Default to production
+
+      if (urlParams.get("local") === "true") {
+        document.write('<script src="mock-twitch-ext.js"><\/script>');
+        EBS_URL =
+          urlParams.get("ebs") === "notion"
+            ? "http://localhost:8081"
+            : "http://localhost:8082";
+      } else {
+        document.write(
+          '<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"><\/script>',
+        );
+      }
+    </script>
+  </head>
+  <body
+    class="bg-background-light dark:bg-background-dark font-display text-text-light p-8"
+  >
+    <div class="max-w-2xl mx-auto">
+      <h1 class="text-3xl font-bold mb-8">Tasky Configuration</h1>
+
+      <!-- Setup Progress -->
+      <div class="mb-8">
+        <div class="flex items-center mb-4">
+          <div class="flex-1">
+            <h2 class="text-xl font-semibold mb-2">Setup Progress</h2>
+            <div class="h-2 bg-gray-700 rounded-full">
+              <div
+                id="setup-progress"
+                class="h-full bg-primary rounded-full transition-all duration-500"
+                style="width: 0%"
+              ></div>
+            </div>
+          </div>
+        </div>
+        <div id="setup-status" class="text-sm text-text-muted"></div>
+      </div>
+
+      <!-- Notion Setup Section -->
+      <div
+        class="bg-background-dark/80 rounded-xl border border-border-color/50 p-6 mb-6"
+      >
+        <h2 class="text-xl font-semibold mb-4">1. Notion Integration Setup</h2>
+
+        <div class="space-y-4">
+          <div id="notion-steps">
+            <div class="flex items-start space-x-3 mb-4">
+              <button
+                onclick="window.open('https://www.notion.so/my-integrations', '_blank')"
+                class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/80 transition-colors"
+              >
+                Create Notion Integration
+              </button>
+              <p class="text-sm text-text-muted">
+                First, create a new integration in Notion. Make sure to give it
+                permissions to create and modify databases.
+              </p>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium mb-2"
+                >Notion API Key</label
+              >
+              <input
+                type="password"
+                id="notion-key"
+                class="w-full bg-background-light border-border-color/50 rounded-lg focus:ring-primary focus:border-primary"
+                placeholder="secret_..."
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Database Setup Section -->
+      <div
+        class="bg-background-dark/80 rounded-xl border border-border-color/50 p-6 mb-6"
+      >
+        <h2 class="text-xl font-semibold mb-4">2. Database Setup</h2>
+
+        <div id="database-setup" class="space-y-4">
+          <p class="text-sm text-text-muted mb-4">
+            Choose a Notion page where you want your task databases to be
+            created:
+          </p>
+
+          <div class="flex items-start space-x-3 mb-4">
+            <button
+              onclick="window.open('https://notion.so', '_blank')"
+              class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/80 transition-colors"
+            >
+              Open Notion
+            </button>
+            <p class="text-sm text-text-muted">
+              Copy the URL of the page where you want to create the databases.
+            </p>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-2"
+              >Notion Page URL</label
+            >
+            <input
+              type="text"
+              id="page-url"
+              class="w-full bg-background-light border-border-color/50 rounded-lg focus:ring-primary focus:border-primary"
+              placeholder="https://notion.so/..."
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex justify-end space-x-4">
+        <button
+          id="test-connection"
+          onclick="testConnection()"
+          class="bg-background-light text-text-light px-6 py-2 rounded-lg hover:bg-background-light/80 transition-colors"
+        >
+          Test Connection
+        </button>
+        <button
+          id="save-config"
+          onclick="saveConfiguration()"
+          class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/80 transition-colors"
+        >
+          Save Configuration
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const twitch = window.Twitch.ext;
+      let authToken = null;
+
+      // Initialize Twitch Extension
+      twitch.onAuthorized(async (auth) => {
+        console.log("Configuration panel authorized");
+        authToken = auth.token;
+        await checkSetupStatus();
+      });
+
+      async function checkSetupStatus() {
+        try {
+          const response = await fetch(`${EBS_URL}/setup/status`, {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+          const status = await response.json();
+          updateSetupProgress(status);
+        } catch (error) {
+          console.error("Error checking setup status:", error);
+          document.getElementById("setup-status").textContent =
+            "Error checking setup status";
+        }
+      }
+
+      function updateSetupProgress(status) {
+        const progressBar = document.getElementById("setup-progress");
+        const statusText = document.getElementById("setup-status");
+
+        let progress = 0;
+        let message = "";
+
+        if (status.notionConnected) {
+          progress += 50;
+          message = "Notion integration connected. ";
+        }
+
+        if (status.databasesCreated) {
+          progress += 50;
+          message += "Databases created and configured.";
+        }
+
+        progressBar.style.width = `${progress}%`;
+        statusText.textContent = message || "Setup not started";
+      }
+
+      async function testConnection() {
+        const notionKey = document.getElementById("notion-key").value;
+        const pageUrl = document.getElementById("page-url").value;
+
+        if (!notionKey || !pageUrl) {
+          alert("Please fill in both the Notion API key and page URL");
+          return;
+        }
+
+        try {
+          const response = await fetch(`${EBS_URL}/setup/test`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({
+              notionKey,
+              pageUrl,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            alert("Connection successful! You can now save the configuration.");
+          } else {
+            alert(`Connection failed: ${result.error}`);
+          }
+        } catch (error) {
+          console.error("Error testing connection:", error);
+          alert(
+            "Error testing connection. Please check the console for details.",
+          );
+        }
+      }
+
+      async function saveConfiguration() {
+        const notionKey = document.getElementById("notion-key").value;
+        const pageUrl = document.getElementById("page-url").value;
+
+        if (!notionKey || !pageUrl) {
+          alert("Please fill in both the Notion API key and page URL");
+          return;
+        }
+
+        try {
+          const response = await fetch(`${EBS_URL}/setup/configure`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({
+              notionKey,
+              pageUrl,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            alert("Configuration saved successfully!");
+            await checkSetupStatus();
+          } else {
+            alert(`Configuration failed: ${result.error}`);
+          }
+        } catch (error) {
+          console.error("Error saving configuration:", error);
+          alert(
+            "Error saving configuration. Please check the console for details.",
+          );
+        }
+      }
+    </script>
+  </body>
+</html>

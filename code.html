@@ -1,103 +1,151 @@
-<!DOCTYPE html>
-<html class="dark" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Twitch Extension - Task Overlay</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="themes.css">
-<script>
+<!doctype html>
+<html class="dark" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Twitch Extension - Task Overlay</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="themes.css" />
+    <script>
       const urlParams = new URLSearchParams(window.location.search);
       // We'll define the EBS_URL globally based on the 'local' param.
-      let EBS_URL;
+      let EBS_URL = "https://yummy-badgers-dream.loca.lt"; // Default to production
 
-      if (urlParams.get('local') === 'true') {
-        // For local testing, use the mock EBS and mock Twitch helper
+      if (urlParams.get("local") === "true") {
+        // For local testing, always use the mock Twitch helper
         document.write('<script src="mock-twitch-ext.js"><\/script>');
-        EBS_URL = "http://localhost:8082";
+        if (urlParams.get("ebs") === "notion") {
+          EBS_URL = "http://localhost:8081"; // Point to the real Notion EBS
+        } else {
+          EBS_URL = "http://localhost:8082"; // Default to the mock EBS
+        }
       } else {
-        // For production/Twitch sandbox, use the real helper and EBS
-        document.write('<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"><\/script>');
-        EBS_URL = "https://yummy-badgers-dream.loca.lt";
+        // For production/Twitch sandbox, use the real helper
+        document.write(
+          '<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"><\/script>',
+        );
       }
     </script>
-<script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "var(--primary)",
-                        "background-light": "var(--background-light)",
-                        "background-dark": "var(--background-dark)",
-                        "text-light": "var(--text-light)",
-                        "text-muted": "var(--text-muted)",
-                        "border-color": "var(--border-color)",
-                        "vip-glow": "var(--vip-glow)",
-                        "vip-bg": "var(--vip-bg)",
-                        "subscriber": "var(--subscriber)",
-                    },
-                    fontFamily: {
-                        "display": ["Inter"]
-                    },
-                    borderRadius: {
-                        "DEFAULT": "0.75rem",
-                        "lg": "1rem",
-                        "xl": "1.5rem",
-                        "full": "9999px"
-                    },
-                },
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "var(--primary)",
+              "background-light": "var(--background-light)",
+              "background-dark": "var(--background-dark)",
+              "text-light": "var(--text-light)",
+              "text-muted": "var(--text-muted)",
+              "border-color": "var(--border-color)",
+              "vip-glow": "var(--vip-glow)",
+              "vip-bg": "var(--vip-bg)",
+              subscriber: "var(--subscriber)",
             },
-        }
+            fontFamily: {
+              display: ["Inter"],
+            },
+            borderRadius: {
+              DEFAULT: "0.75rem",
+              lg: "1rem",
+              xl: "1.5rem",
+              full: "9999px",
+            },
+          },
+        },
+      };
     </script>
-
   </head>
-<body class="bg-background-light dark:bg-background-dark font-display">
-<div class="relative min-h-screen p-4 sm:p-6 lg:p-8 flex items-start justify-end">
-    <div class="absolute top-5 left-5 z-10">
-        <select id="theme-switcher" class="bg-background-dark/80 text-text-light rounded-lg border-border-color/50 focus:ring-primary focus:border-primary">
-            <option value="">Default</option>
-            <option value="forest">Forest</option>
-            <option value="midnight">Midnight</option>
+  <body class="bg-background-light dark:bg-background-dark font-display">
+    <div
+      class="relative min-h-screen p-4 sm:p-6 lg:p-8 flex items-start justify-end"
+    >
+      <div class="absolute top-5 left-5 z-10">
+        <select
+          id="theme-switcher"
+          class="bg-background-dark/80 text-text-light rounded-lg border-border-color/50 focus:ring-primary focus:border-primary"
+        >
+          <option value="">Default</option>
+          <option value="forest">Forest</option>
+          <option value="midnight">Midnight</option>
         </select>
+      </div>
+      <div
+        class="w-full max-w-sm bg-background-dark/80 dark:bg-background-dark/80 backdrop-blur-xl rounded-xl border border-border-color/50 shadow-2xl shadow-primary/10 flex flex-col gap-5 text-text-light p-5"
+      >
+        <div class="flex flex-col gap-2">
+          <div class="flex justify-between items-baseline">
+            <p class="text-base font-bold leading-normal text-text-light">
+              Community Focus
+            </p>
+            <p
+              class="text-sm font-medium leading-normal text-text-muted"
+              id="task-counter"
+            >
+              0/0
+            </p>
+          </div>
+          <div class="h-2.5 w-full bg-black/20 rounded-full overflow-hidden">
+            <div
+              class="h-full bg-primary rounded-full"
+              id="task-progress-bar"
+              style="width: 0%"
+            ></div>
+          </div>
+        </div>
+        <div class="h-px bg-border-color/50"></div>
+        <div>
+          <h3
+            class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3"
+          >
+            Streamer Tasks
+          </h3>
+          <div id="streamer-tasks" class="flex flex-col">
+            <!-- Streamer tasks will be dynamically inserted here -->
+          </div>
+        </div>
+        <div>
+          <h3
+            class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3"
+          >
+            Viewer Tasks
+          </h3>
+          <div
+            id="viewer-tasks"
+            class="flex flex-col max-h-[20rem] overflow-y-auto space-y-1 pr-1"
+          >
+            <!-- Viewer tasks will be dynamically inserted here -->
+          </div>
+        </div>
+        <div>
+          <h3
+            class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3"
+          >
+            Bonus Goals
+          </h3>
+          <div
+            class="flex flex-col items-center justify-center py-6 px-4 text-center bg-black/20 rounded-xl"
+          >
+            <span class="material-symbols-outlined text-4xl text-text-muted">
+              checklist
+            </span>
+            <p class="text-sm font-medium text-text-muted mt-1">
+              No bonus goals yet.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
-<div class="w-full max-w-sm bg-background-dark/80 dark:bg-background-dark/80 backdrop-blur-xl rounded-xl border border-border-color/50 shadow-2xl shadow-primary/10 flex flex-col gap-5 text-text-light p-5">
-<div class="flex flex-col gap-2">
-<div class="flex justify-between items-baseline">
-<p class="text-base font-bold leading-normal text-text-light">Community Focus</p>
-<p class="text-sm font-medium leading-normal text-text-muted" id="task-counter">0/0</p>
-</div>
-<div class="h-2.5 w-full bg-black/20 rounded-full overflow-hidden">
-<div class="h-full bg-primary rounded-full" id="task-progress-bar" style="width: 0%;"></div>
-</div>
-</div>
-<div class="h-px bg-border-color/50"></div>
-<div>
-<h3 class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3">Streamer Tasks</h3>
-<div id="streamer-tasks" class="flex flex-col">
-<!-- Streamer tasks will be dynamically inserted here -->
-</div>
-</div>
-<div>
-<h3 class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3">Viewer Tasks</h3>
-<div id="viewer-tasks" class="flex flex-col max-h-[20rem] overflow-y-auto space-y-1 pr-1">
-<!-- Viewer tasks will be dynamically inserted here -->
-</div>
-</div>
-<div>
-<h3 class="text-lg font-extrabold leading-tight tracking-[-0.015em] text-text-light mb-3">Bonus Goals</h3>
-<div class="flex flex-col items-center justify-center py-6 px-4 text-center bg-black/20 rounded-xl">
-<span class="material-symbols-outlined text-4xl text-text-muted">
-                    checklist
-                    </span>
-<p class="text-sm font-medium text-text-muted mt-1">No bonus goals yet.</p>
-</div>
-</div>
-</div>
-</div>
-<script>
+    <script>
       const twitch = window.Twitch.ext;
       const streamerTasksDiv = document.getElementById("streamer-tasks");
       const viewerTasksDiv = document.getElementById("viewer-tasks");
@@ -132,15 +180,18 @@
           updateTaskCounter(data.streamerTasks, data.viewerTasks);
           renderStreamerTasks(data.streamerTasks);
           renderViewerTasks(data.viewerTasks);
-
         } catch (error) {
           console.error("Error fetching tasks:", error);
         }
       }
 
       function updateCounterFromDOM() {
-        const allTasks = document.querySelectorAll('#streamer-tasks input[type="checkbox"], #viewer-tasks input[type="checkbox"]');
-        const completedTasks = document.querySelectorAll('#streamer-tasks input:checked, #viewer-tasks input:checked');
+        const allTasks = document.querySelectorAll(
+          '#streamer-tasks input[type="checkbox"], #viewer-tasks input[type="checkbox"]',
+        );
+        const completedTasks = document.querySelectorAll(
+          "#streamer-tasks input:checked, #viewer-tasks input:checked",
+        );
         const total = allTasks.length;
         const completed = completedTasks.length;
         const counterEl = document.getElementById("task-counter");
@@ -157,7 +208,7 @@
 
       function updateTaskCounter(streamerTasks, viewerTasks) {
         const allTasks = [...streamerTasks, ...viewerTasks];
-        const completedTasks = allTasks.filter(task => task.completed).length;
+        const completedTasks = allTasks.filter((task) => task.completed).length;
         const totalTasks = allTasks.length;
 
         const counterEl = document.getElementById("task-counter");
@@ -175,71 +226,82 @@
       function renderStreamerTasks(tasks) {
         streamerTasksDiv.innerHTML = ""; // Clear existing tasks
         if (tasks.length === 0) {
-            streamerTasksDiv.innerHTML = "<p>No streamer tasks yet.</p>";
-            return;
+          streamerTasksDiv.innerHTML = "<p>No streamer tasks yet.</p>";
+          return;
         }
-        tasks.forEach(task => {
-            const el = document.createElement("label");
-            el.className = "flex items-center gap-4 py-1.5 px-2 cursor-pointer group bg-black/20 rounded-lg";
-            el.innerHTML = `
-                <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? 'checked' : ''}/>
+        tasks.forEach((task) => {
+          const el = document.createElement("label");
+          el.className =
+            "flex items-center gap-4 py-1.5 px-2 cursor-pointer group bg-black/20 rounded-lg";
+          el.innerHTML = `
+                <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? "checked" : ""}/>
                 <p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">${task.title}</p>
             `;
-            streamerTasksDiv.appendChild(el);
+          streamerTasksDiv.appendChild(el);
         });
       }
 
       function renderViewerTasks(tasks) {
-          viewerTasksDiv.innerHTML = ""; // Clear existing tasks
-          if (tasks.length === 0) {
-              viewerTasksDiv.innerHTML = "<p>No viewer tasks yet.</p>";
-              return;
+        viewerTasksDiv.innerHTML = ""; // Clear existing tasks
+        if (tasks.length === 0) {
+          viewerTasksDiv.innerHTML = "<p>No viewer tasks yet.</p>";
+          return;
+        }
+        // Sort tasks by role priority: VIP > Moderator > Subscriber > Viewer
+        const rolePriority = {
+          VIP: 1,
+          Moderator: 2,
+          SubscriberT3: 3,
+          SubscriberT2: 4,
+          SubscriberT1: 5,
+          Viewer: 6,
+        };
+        tasks.sort((a, b) => {
+          const priorityA = rolePriority[a.role] || 100;
+          const priorityB = rolePriority[b.role] || 100;
+          return priorityA - priorityB;
+        });
+
+        tasks.forEach((task) => {
+          const el = document.createElement("label");
+          el.htmlFor = `viewer-task-${task.id}`;
+
+          let iconHtml = "";
+          let titleClass = "text-text-light";
+          let containerClass = "bg-black/20";
+
+          switch (task.role) {
+            case "VIP":
+              containerClass = "bg-vip-bg vip-task";
+              titleClass = "text-vip-glow font-bold";
+              iconHtml =
+                '<span class="material-symbols-outlined text-3xl text-vip-glow">workspace_premium</span>';
+              break;
+            case "Moderator":
+              // Assuming a moderator style might exist or be added
+              titleClass = "text-primary font-bold";
+              iconHtml =
+                '<span class="material-symbols-outlined text-2xl text-primary">shield</span>';
+              break;
+            case "SubscriberT1":
+            case "SubscriberT2":
+            case "SubscriberT3":
+              containerClass = "bg-black/20";
+              titleClass = "text-subscriber";
+              iconHtml =
+                '<span class="material-symbols-outlined text-2xl text-subscriber">star</span>';
+              break;
           }
-          // Sort tasks by role priority: VIP > Moderator > Subscriber > Viewer
-          const rolePriority = { 'VIP': 1, 'Moderator': 2, 'SubscriberT3': 3, 'SubscriberT2': 4, 'SubscriberT1': 5, 'Viewer': 6 };
-          tasks.sort((a, b) => {
-            const priorityA = rolePriority[a.role] || 100;
-            const priorityB = rolePriority[b.role] || 100;
-            return priorityA - priorityB;
-          });
 
-          tasks.forEach(task => {
-              const el = document.createElement("label");
-              el.htmlFor = `viewer-task-${task.id}`;
+          // Apply a disabled style for rejected or completed tasks
+          if (task.status === "Rejected" || task.completed) {
+            el.classList.add("opacity-50", "line-through");
+          }
 
-              let iconHtml = '';
-              let titleClass = 'text-text-light';
-              let containerClass = 'bg-black/20';
-
-              switch (task.role) {
-                case 'VIP':
-                  containerClass = 'bg-vip-bg vip-task';
-                  titleClass = 'text-vip-glow font-bold';
-                  iconHtml = '<span class="material-symbols-outlined text-3xl text-vip-glow">workspace_premium</span>';
-                  break;
-                case 'Moderator':
-                  // Assuming a moderator style might exist or be added
-                  titleClass = 'text-primary font-bold';
-                  iconHtml = '<span class="material-symbols-outlined text-2xl text-primary">shield</span>';
-                  break;
-                case 'SubscriberT1':
-                case 'SubscriberT2':
-                case 'SubscriberT3':
-                  containerClass = 'bg-black/20';
-                  titleClass = 'text-subscriber';
-                  iconHtml = '<span class="material-symbols-outlined text-2xl text-subscriber">star</span>';
-                  break;
-              }
-
-              // Apply a disabled style for rejected or completed tasks
-              if (task.status === 'Rejected' || task.completed) {
-                  el.classList.add('opacity-50', 'line-through');
-              }
-
-              el.className = `relative flex items-center gap-4 py-1.5 px-2 group rounded-lg cursor-pointer ${containerClass}`;
-              el.innerHTML = `
+          el.className = `relative flex items-center gap-4 py-1.5 px-2 group rounded-lg cursor-pointer ${containerClass}`;
+          el.innerHTML = `
                 <div class="flex-shrink-0">
-                  <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
+                  <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? "checked" : ""}/>
                 </div>
                 <div class="flex flex-col justify-center flex-1">
                     <span class="text-base font-medium leading-normal ${titleClass} group-hover:text-primary transition-colors">${task.title}</span>
@@ -248,17 +310,18 @@
                 ${iconHtml}
               `;
 
-              viewerTasksDiv.appendChild(el);
-          });
+          viewerTasksDiv.appendChild(el);
+        });
       }
 
       twitch.onContext((context, changed) => {
         // console.log('Context changed:', context);
       });
 
-      const themeSwitcher = document.getElementById('theme-switcher');
-      themeSwitcher.addEventListener('change', (event) => {
-        document.documentElement.setAttribute('data-theme', event.target.value);
+      const themeSwitcher = document.getElementById("theme-switcher");
+      themeSwitcher.addEventListener("change", (event) => {
+        document.documentElement.setAttribute("data-theme", event.target.value);
       });
     </script>
-</body></html>
+  </body>
+</html>

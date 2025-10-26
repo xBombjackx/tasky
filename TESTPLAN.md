@@ -1,12 +1,15 @@
 # Local Testing Plan
 
-This document outlines the steps to test the Twitch extension locally, including the mock UI and the Notion integration.
+This document outlines the steps to test the Twitch extension locally, including
+the mock UI and the Notion integration.
 
 ## Prerequisites
 
 - **Node.js and npm**: Ensure you have Node.js and npm installed.
-- **Notion Account**: You'll need a Notion account with a new integration and two databases (one for streamer tasks, one for viewer tasks).
-- **Twitch Dev Account**: A Twitch developer account is required to get an extension secret.
+- **Notion Account**: You'll need a Notion account with a new integration and
+  two databases (one for streamer tasks, one for viewer tasks).
+- **Twitch Dev Account**: A Twitch developer account is required to get an
+  extension secret.
 
 ## Configuration
 
@@ -22,10 +25,42 @@ This document outlines the steps to test the Twitch extension locally, including
     ```
 
 3.  **Populate the `.env` file**:
-    -   `NOTION_API_KEY`: Your Notion integration secret.
-    -   `STREAMER_DATABASE_ID`: The ID of your streamer tasks database.
-    -   `VIEWER_DATABASE_ID`: The ID of your viewer tasks database.
-    -   `TWITCH_EXTENSION_SECRET`: A Base64 encoded secret from your Twitch extension's settings.
+    - `NOTION_API_KEY`: Your Notion integration secret.
+    - `STREAMER_DATABASE_ID`: The ID of your streamer tasks database.
+    - `VIEWER_DATABASE_ID`: The ID of your viewer tasks database.
+    - `TWITCH_EXTENSION_SECRET`: A Base64 encoded secret from your Twitch
+      extension's settings.
+
+## Notion Database Setup
+
+Before running the application, you need to set up two databases in Notion with
+the correct schema.
+
+### Streamer Tasks Database Schema
+
+This database holds tasks for the streamer.
+
+| Property Name | Type       | Description                                                              |
+| ------------- | ---------- | ------------------------------------------------------------------------ |
+| `Task`        | `Title`    | The name or description of the task. This is the main property.          |
+| `Status`      | `Status`   | The current status of the task. Options: `To-do`, `In progress`, `Done`. |
+| `Cost`        | `Number`   | (Optional) The cost of the task, e.g., in channel points.                |
+| `Completed`   | `Checkbox` | A checkbox to indicate if the task is completed.                         |
+
+### Viewer Tasks Database Schema
+
+This database holds tasks submitted by viewers.
+
+| Property Name  | Type       | Description                                                                                                      |
+| -------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| `Task`         | `Title`    | The name or description of the task. This is the main property.                                                  |
+| `Suggested by` | `Text`     | The Twitch username of the viewer who submitted the task.                                                        |
+| `Role`         | `Select`   | The role of the submitter. Options: `Viewer`, `VIP`, `SubscriberT1`, `SubscriberT2`, `SubscriberT3`,`Moderator`. |
+| `Status`       | `Status`   | The status of the suggestion. Options: `Pending`, `Approved`, `Rejected`.                                        |
+| `Completed`    | `Checkbox` | A checkbox to indicate if the task has been completed by the streamer.                                           |
+
+**Note:** Ensure the property names in your Notion databases match exactly what
+is listed above, as the integration will use these names to read and write data.
 
 ## Running the Servers
 
@@ -34,6 +69,7 @@ You will need two terminal sessions for local testing.
 ### Terminal 1: Mock EBS (for UI testing)
 
 1.  **Install dependencies**:
+
     ```bash
     npm install
     ```
@@ -54,14 +90,22 @@ You will need two terminal sessions for local testing.
 
 ## Testing the Frontend
 
-1.  **Serve the frontend**: Since the frontend is a static `code.html` file, you need a simple HTTP server to serve it to avoid CORS issues.
+1.  **Serve the frontend**: Since the frontend is a static `code.html` file, you
+    need a simple HTTP server to serve it to avoid CORS issues.
+
     ```bash
     python3 -m http.server
     ```
-    This will serve the files in the current directory on `http://localhost:8000`.
+
+    This will serve the files in the current directory on
+    `http://localhost:8000`.
 
 2.  **Open the frontend in your browser**:
-    -   **For UI testing with mock data**: `http://localhost:8000/code.html?local=true`
-    -   **For Notion integration testing**: `http://localhost:8000/code.html`
+    - **For UI testing with mock data**:
+      `http://localhost:8000/code.html?local=true`
+    - **For Notion integration testing**: `http://localhost:8000/code.html`
 
-    *Note: For Notion integration testing, you will need a valid Twitch JWT, which is typically only available when the extension is running on Twitch. You can use the mock `twitch-ext.js` to provide a dummy JWT for local testing.*
+    _Note: For Notion integration testing, you will need a valid Twitch JWT,
+    which is typically only available when the extension is running on Twitch.
+    You can use the mock `twitch-ext.js` to provide a dummy JWT for local
+    testing._

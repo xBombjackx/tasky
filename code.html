@@ -195,49 +195,59 @@
               viewerTasksDiv.innerHTML = "<p>No viewer tasks yet.</p>";
               return;
           }
+          // Sort tasks by role priority: VIP > Moderator > Subscriber > Viewer
+          const rolePriority = { 'VIP': 1, 'Moderator': 2, 'SubscriberT3': 3, 'SubscriberT2': 4, 'SubscriberT1': 5, 'Viewer': 6 };
           tasks.sort((a, b) => {
-            if (a.is_vip && !b.is_vip) return -1;
-            if (!a.is_vip && b.is_vip) return 1;
-            if (a.is_subscriber && !b.is_subscriber) return -1;
-            if (!a.is_subscriber && b.is_subscriber) return 1;
-            return 0;
+            const priorityA = rolePriority[a.role] || 100;
+            const priorityB = rolePriority[b.role] || 100;
+            return priorityA - priorityB;
           });
+
           tasks.forEach(task => {
-              let el = document.createElement("div");
-              if (task.is_vip) {
-                el = document.createElement("label");
-                el.htmlFor = `viewer-task-${task.id}`;
-                el.className = "vip-task relative flex items-center gap-4 py-1.5 px-2 group bg-vip-bg rounded-lg cursor-pointer";
-                el.innerHTML = `
-                  <div class="flex-shrink-0">
-                    <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
-                  </div>
-                  <div class="flex flex-col justify-center flex-1">
-                      <span class="text-base font-bold leading-normal text-vip-glow">${task.title}</span>
-                      <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
-                  </div>
-                  <span class="material-symbols-outlined text-3xl text-vip-glow">workspace_premium</span>
-                `;
-              } else if (task.is_subscriber) {
-                el.className = "flex items-center gap-4 py-1.5 px-2 group bg-black/20 rounded-lg";
-                el.innerHTML = `
-                    <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
-                    <div class="flex flex-col justify-center flex-1">
-                        <label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-${task.id}">${task.title}</label>
-                        <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
-                    </div>
-                    <span class="material-symbols-outlined text-2xl text-subscriber">star</span>
-                `;
-              } else {
-                el.className = "flex items-center gap-4 py-1.5 px-2 group bg-black/20 rounded-lg";
-                el.innerHTML = `
-                    <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
-                    <div class="flex flex-col justify-center flex-1">
-                        <label class="text-base font-medium leading-normal text-text-light cursor-pointer group-hover:text-primary transition-colors" for="viewer-task-${task.id}">${task.title}</label>
-                        <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
-                    </div>
-                `;
+              const el = document.createElement("label");
+              el.htmlFor = `viewer-task-${task.id}`;
+
+              let iconHtml = '';
+              let titleClass = 'text-text-light';
+              let containerClass = 'bg-black/20';
+
+              switch (task.role) {
+                case 'VIP':
+                  containerClass = 'bg-vip-bg vip-task';
+                  titleClass = 'text-vip-glow font-bold';
+                  iconHtml = '<span class="material-symbols-outlined text-3xl text-vip-glow">workspace_premium</span>';
+                  break;
+                case 'Moderator':
+                  // Assuming a moderator style might exist or be added
+                  titleClass = 'text-primary font-bold';
+                  iconHtml = '<span class="material-symbols-outlined text-2xl text-primary">shield</span>';
+                  break;
+                case 'SubscriberT1':
+                case 'SubscriberT2':
+                case 'SubscriberT3':
+                  containerClass = 'bg-black/20';
+                  titleClass = 'text-subscriber';
+                  iconHtml = '<span class="material-symbols-outlined text-2xl text-subscriber">star</span>';
+                  break;
               }
+
+              // Apply a disabled style for rejected or completed tasks
+              if (task.status === 'Rejected' || task.completed) {
+                  el.classList.add('opacity-50', 'line-through');
+              }
+
+              el.className = `relative flex items-center gap-4 py-1.5 px-2 group rounded-lg cursor-pointer ${containerClass}`;
+              el.innerHTML = `
+                <div class="flex-shrink-0">
+                  <input type="checkbox" onchange="updateCounterFromDOM()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? 'checked' : ''}/>
+                </div>
+                <div class="flex flex-col justify-center flex-1">
+                    <span class="text-base font-medium leading-normal ${titleClass} group-hover:text-primary transition-colors">${task.title}</span>
+                    <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
+                </div>
+                ${iconHtml}
+              `;
+
               viewerTasksDiv.appendChild(el);
           });
       }

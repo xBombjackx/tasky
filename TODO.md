@@ -6,14 +6,19 @@ This file tracks the development tasks for the Twitch Extension, based on the in
 
 These tasks address items from the code review and should be completed before building major new features.
 
-- [ ] **[ebs.js]** Update all user-related functions (`POST /tasks`, `findUserTask`, etc.) to consistently use the `opaque_user_id` as the unique identifier for viewers, not `username`.
+- [ ] **[ebs.js]** **Critical:** Update all user-related functions (`POST /tasks`, `findUserTask`, etc.) to consistently use the `opaque_user_id` as the unique identifier for viewers, not `username`.
 - [ ] **[ebs.js]** Ensure the Notion "Submitter" column is configured to store the `opaque_user_id` when a task is created via `POST /tasks`.
-- [ ] **[video_overlay.html]** Improve frontend error handling in `fetchTasks` to display a user-friendly "Could not load tasks" message on failure, rather than just the auth status.
+- [ ] **[ebs.js]** Add input validation to the `POST /tasks` endpoint to sanitize `taskDescription` and prevent potential injection attacks.
+- [ ] **[ebs.js]** Correct the schema mismatch in `getTasksForOverlay` to use `"Status"` instead of `"State"` when querying for streamer tasks.
+- [ ] **[ebs.js]** Add `await` to the `updateDatabaseSchema` and `migrateDatabase` calls in the `initializeServer` function to prevent race conditions.
+- [ ] **[code.html]** Improve frontend error handling in `fetchTasks` to display a user-friendly "Could not load tasks" message on failure, rather than just logging to the console.
+- [ ] **[code.html]** Remove the redundant `updateCounterFromDOM` function and rely solely on `updateTaskCounter` for better performance.
+- [ ] **[ebs.js]** **Architecture:** Transition from using `.env` variables for database IDs to storing and retrieving them from the Twitch Configuration Service. This will better support multi-broadcaster setups.
 
 ## Phase 1: Core Backend & Read-Only Overlay
 
-- [ ] **[video_overlay.html]** Build out the UI to fetch and render the `streamerTasks` and `viewerTasks` lists from the `GET /tasks` endpoint.
-- [ ] **[video_overlay.html]** Style the overlay to be clean, readable, and respect the 3-task limit for the viewer list.
+- [ ] **[code.html]** Build out the UI to fetch and render the `streamerTasks` and `viewerTasks` lists from the `GET /tasks` endpoint.
+- [ ] **[code.html]** Style the overlay to be clean, readable, and respect the 3-task limit for the viewer list.
 
 ## Phase 2: Viewer Submission & Moderation
 
@@ -33,11 +38,11 @@ These tasks address items from the code review and should be completed before bu
 - [ ] **[ebs.js]** Create a new endpoint `PUT /tasks/complete` (or similar) that finds the user's active task (via their `opaque_user_id`) and marks its "Status" as complete in Notion.
 - [ ] **[ebs.js]** Integrate the Twitch Configuration Service. On _any_ task completion (streamer or viewer), increment a `Progress_Points` value in the broadcaster's config segment.
 - [ ] **[ebs.js]** Create a new _unauthenticated_ endpoint `GET /progress` that reads the `Progress_Points` from the Twitch Config Service (so the overlay can fetch it without a user JWT).
-- [ ] **[video_overlay.html]** Build the "Focus Bar" UI element.
-- [ ] **[video_overlay.html]** Add logic to periodically fetch from `GET /progress` and update the fill of the Focus Bar.
+- [ ] **[code.html]** Build the "Focus Bar" UI element.
+- [ ] **[code.html]** Add logic to periodically fetch from `GET /progress` and update the fill of the Focus Bar.
 - [ ] **[ebs.js]** Add logic to the task completion endpoint to check if `Progress_Points` has crossed a Tier threshold (3, 7, 12).
 - [ ] **[ebs.js]** If a Tier is met, use the Twitch API (with an App Access Token) to send an automated congratulatory chat message.
-- [ ] **[video_overlay.html]** Add a simple CSS animation or visual cue that triggers when the progress bar hits a new Tier.
+- [ ] **[code.html]** Add a simple CSS animation or visual cue that triggers when the progress bar hits a new Tier.
 
 ## Future (Post-MVP)
 

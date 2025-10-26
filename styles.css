@@ -12,24 +12,7 @@
             50% { color: #fff; }
             100% { color: #f6d55c; }
           }
-          .vip-task {
-            position: relative;
-            border: 2px solid transparent;
-            animation: pulse-glow 3s infinite ease-in-out;
-            border-radius: 1rem;
-          }
-          .vip-task::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 200%;
-            height: 100%;
-            background: linear-gradient(110deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0) 60%);
-            animation: shimmer 4s infinite linear;
-            transform: skewX(-25deg);
-            pointer-events: none;
-          }
+
           .vip-task .vip-text {
             animation: text-shine 5s infinite ease-in-out;
           }

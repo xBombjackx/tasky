@@ -6,14 +6,15 @@ This file tracks the development tasks for the Twitch Extension, based on the in
 
 These tasks address items from the code review and should be completed before building major new features.
 
-- [ ] **[ebs.js]** **Critical:** Update all user-related functions (`POST /tasks`, `findUserTask`, etc.) to consistently use the `opaque_user_id` as the unique identifier for viewers, not `username`.
-- [ ] **[ebs.js]** Ensure the Notion "Submitter" column is configured to store the `opaque_user_id` when a task is created via `POST /tasks`.
-- [ ] **[ebs.js]** Add input validation to the `POST /tasks` endpoint to sanitize `taskDescription` and prevent potential injection attacks.
-- [ ] **[ebs.js]** Correct the schema mismatch in `getTasksForOverlay` to use `"Status"` instead of `"State"` when querying for streamer tasks.
-- [ ] **[ebs.js]** Add `await` to the `updateDatabaseSchema` and `migrateDatabase` calls in the `initializeServer` function to prevent race conditions.
-- [ ] **[code.html]** Improve frontend error handling in `fetchTasks` to display a user-friendly "Could not load tasks" message on failure, rather than just logging to the console.
-- [ ] **[code.html]** Remove the redundant `updateCounterFromDOM` function and rely solely on `updateTaskCounter` for better performance.
-- [ ] **[ebs.js]** **Architecture:** Transition from using `.env` variables for database IDs to storing and retrieving them from the Twitch Configuration Service. This will better support multi-broadcaster setups.
+- [x] **[ebs.js]** **Critical:** Update all user-related functions (`POST /tasks`, `findUserTask`, etc.) to consistently use the `opaque_user_id` as the unique identifier for viewers, not `username`.
+- [x] **[ebs.js]** Ensure the Notion "Submitter" column is configured to store the `opaque_user_id` when a task is created via `POST /tasks`.
+- [x] **[ebs.js]** Add input validation to the `POST /tasks` endpoint to sanitize `taskDescription` and prevent potential injection attacks.
+- [x] **[ebs.js]** Correct the schema mismatch in `getTasksForOverlay` to use `"Status"` instead of `"State"` when querying for streamer tasks.
+- [x] **[ebs.js]** Add `await` to the `updateDatabaseSchema` and `migrateDatabase` calls in the `initializeServer` function to prevent race conditions.
+- [x] **[code.html]** Improve frontend error handling in `fetchTasks` to display a user-friendly "Could not load tasks" message on failure, rather than just logging to the console.
+- [x] **[code.html]** Remove the redundant `updateCounterFromDOM` function and rely solely on `updateTaskCounter` for better performance.
+- [x] **[ebs.js]** **Architecture:** Transition from using `.env` variables for database IDs to storing and retrieving them from the Twitch Configuration Service. This will better support multi-broadcaster setups.
+- [ ] **[ebs.js]** **Architecture:** Replace `console.log` placeholders with actual calls to the Twitch Configuration Service to store and retrieve database IDs.
 
 ## Phase 1: Core Backend & Read-Only Overlay
 

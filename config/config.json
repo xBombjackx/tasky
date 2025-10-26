@@ -1,9 +1,0 @@
-{
-  "databases": {
-    "streamer": null,
-    "viewer": null
-  },
-  "schemaVersion": "1.0.0",
-  "setupComplete": false,
-  "lastUpdated": "2025-10-26T08:29:37.559Z"
-}

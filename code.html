@@ -152,13 +152,118 @@
 
       let authToken = null;
       let userId = null;
+      let opaqueUserId = null;
+      let decodedRole = null;
 
       twitch.onAuthorized(async (auth) => {
         console.log("Twitch authorization successful!");
         authToken = auth.token;
         userId = auth.userId;
+
+        // Decode JWT payload locally to extract opaque_user_id and role so we can
+        // decide whether the current viewer may toggle a task checkbox.
+        try {
+          const payloadBase64 = auth.token.split(".")[1];
+          const payloadJson = atob(
+            payloadBase64.replace(/-/g, "+").replace(/_/g, "/"),
+          );
+          const payload = JSON.parse(decodeURIComponent(escape(payloadJson)));
+          opaqueUserId = payload.opaque_user_id || payload.user_id || null;
+          decodedRole = payload.role || null;
+        } catch (err) {
+          console.warn("Could not decode JWT payload locally:", err);
+        }
+
         await fetchTasks();
       });
+
+      // Helper: mark the current viewer's approved task as completed (or not)
+      async function markMyTaskComplete(isComplete) {
+        if (!authToken) return false;
+        try {
+          const resp = await fetch(`${EBS_URL}/tasks/me/complete`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ completed: isComplete }),
+          });
+          if (!resp.ok) {
+            const body = await resp.json().catch(() => ({}));
+            console.warn("Failed to mark my task complete:", resp.status, body);
+            return false;
+          }
+          return true;
+        } catch (err) {
+          console.error("Error marking my task complete:", err);
+          return false;
+        }
+      }
+
+      // Helper: moderator/broadcaster can mark any page complete by pageId
+      async function markPageCompleteAsMod(pageId, isComplete) {
+        if (!authToken) return false;
+        try {
+          const resp = await fetch(`${EBS_URL}/tasks/${pageId}/complete`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ completed: isComplete }),
+          });
+          if (!resp.ok) {
+            const body = await resp.json().catch(() => ({}));
+            console.warn(
+              "Failed to mark page complete as mod:",
+              resp.status,
+              body,
+            );
+            return false;
+          }
+          return true;
+        } catch (err) {
+          console.error("Error marking page complete as mod:", err);
+          return false;
+        }
+      }
+
+      // Called when a viewer checkbox is toggled. If the current viewer owns the task
+      // then call the /tasks/me/complete endpoint. If the user is a moderator/broadcaster
+      // (decodedRole), call the moderator endpoint for the specific pageId. Otherwise
+      // revert the checkbox and show a brief message.
+      async function onViewerCheckboxChange(event, pageId, submitterOpaque) {
+        const checked = event.target.checked;
+        // Allow the owner to mark their own approved task complete
+        if (
+          opaqueUserId &&
+          submitterOpaque &&
+          opaqueUserId === submitterOpaque
+        ) {
+          const ok = await markMyTaskComplete(checked);
+          if (!ok) {
+            // revert UI change
+            event.target.checked = !checked;
+          } else {
+            // refresh to pick up any changes
+            await fetchTasks();
+          }
+          return;
+        }
+
+        // Allow moderators/broadcaster to mark any page complete
+        if (decodedRole === "broadcaster" || decodedRole === "moderator") {
+          const ok = await markPageCompleteAsMod(pageId, checked);
+          if (!ok) event.target.checked = !checked;
+          else await fetchTasks();
+          return;
+        }
+
+        // Otherwise, disallow marking other users' tasks
+        alert("You can only mark your own tasks as complete.");
+        event.target.checked = !checked;
+      }
 
       async function fetchTasks() {
         if (!authToken) {
@@ -176,7 +281,9 @@
           });
 
           if (!response.ok) {
-            throw new Error(`Failed to fetch tasks: ${response.status} ${response.statusText}`);
+            throw new Error(
+              `Failed to fetch tasks: ${response.status} ${response.statusText}`,
+            );
           }
 
           const data = await response.json();
@@ -186,12 +293,12 @@
           renderViewerTasks(data.viewerTasks);
         } catch (error) {
           console.error("Error fetching tasks:", error);
-          const errorMessage = "<p class='text-text-muted'>Could not load tasks. Please try again later.</p>";
+          const errorMessage =
+            "<p class='text-text-muted'>Could not load tasks. Please try again later.</p>";
           streamerTasksDiv.innerHTML = errorMessage;
           viewerTasksDiv.innerHTML = errorMessage;
         }
       }
-
 
       function updateTaskCounter(streamerTasks, viewerTasks) {
         const allTasks = [...streamerTasks, ...viewerTasks];
@@ -288,7 +395,7 @@
           el.className = `relative flex items-center gap-4 py-1.5 px-2 group rounded-lg cursor-pointer ${containerClass}`;
           el.innerHTML = `
                 <div class="flex-shrink-0">
-                  <input type="checkbox" onchange="fetchTasks()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? "checked" : ""}/>
+                  <input type="checkbox" onchange="onViewerCheckboxChange(event, '${task.id}', '${task.submitter}')" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? "checked" : ""}/>
                 </div>
                 <div class="flex flex-col justify-center flex-1">
                     <span class="text-base font-medium leading-normal ${titleClass} group-hover:text-primary transition-colors">${task.title}</span>

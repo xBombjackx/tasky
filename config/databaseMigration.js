@@ -40,36 +40,81 @@ async function updateDatabaseSchema(notion, databaseId, schema) {
   }
 }
 
-async function migrateDatabase(notion, databaseId) {
+async function migrateDatabase(notion, databaseId, schema) {
   try {
+    // Retrieve current database structure so we can be sure properties exist
+    const database = await notion.databases.retrieve({
+      database_id: databaseId,
+    });
+
+    // If the database doesn't have the properties defined by the schema,
+    // skip page-level migrations — the schema update should have added them.
+    const missingProps = Object.keys(schema.properties).filter(
+      (p) => !database.properties[p],
+    );
+    if (missingProps.length > 0) {
+      console.warn(
+        `Database ${databaseId} is missing properties: ${missingProps.join(", ")}. ` +
+          "Skipping page-level migration until schema is applied.",
+      );
+      return false;
+    }
+
     // Get all pages in the database
     const response = await notion.databases.query({
       database_id: databaseId,
     });
 
-    // Add missing properties to each page
+    // Add missing properties to each page according to the provided schema
     for (const page of response.results) {
       const updates = {};
 
-      // If Status is missing, add it as false
-      if (!page.properties.Status) {
-        updates.Status = { checkbox: false };
-      }
-
-      // If Approval Status is missing (for viewer tasks), add it as Pending
-      if (!page.properties["Approval Status"]) {
-        updates["Approval Status"] = {
-          select: { name: "Pending" },
-        };
+      for (const [propName, propConfig] of Object.entries(schema.properties)) {
+        if (!page.properties[propName]) {
+          const propType = Object.keys(propConfig)[0];
+          switch (propType) {
+            case "checkbox":
+              updates[propName] = { checkbox: false };
+              break;
+            case "status": {
+              // Prefer a sensible default if present in schema options
+              const opts = propConfig.status && propConfig.status.options;
+              const defaultName =
+                (opts && opts.find((o) => o.name === "Pending")?.name) ||
+                (opts && opts[0] && opts[0].name) ||
+                "Not started";
+              updates[propName] = { status: { name: defaultName } };
+              break;
+            }
+            case "select": {
+              const opts = propConfig.select && propConfig.select.options;
+              const defaultName =
+                (opts && opts[0] && opts[0].name) || "Default";
+              updates[propName] = { select: { name: defaultName } };
+              break;
+            }
+            // For title/rich_text/etc. we generally skip page-level defaults
+            default:
+              break;
+          }
+        }
       }
 
       // Update the page if we have changes
       if (Object.keys(updates).length > 0) {
-        await notion.pages.update({
-          page_id: page.id,
-          properties: updates,
-        });
-        console.log(`Updated page ${page.id}`);
+        try {
+          await notion.pages.update({
+            page_id: page.id,
+            properties: updates,
+          });
+          console.log(`Updated page ${page.id}`);
+        } catch (pageErr) {
+          // Log and continue — don't let one page break the whole migration
+          console.error(
+            `Failed to update page ${page.id} in DB ${databaseId}:`,
+            pageErr.body || pageErr,
+          );
+        }
       }
     }
 
@@ -80,7 +125,43 @@ async function migrateDatabase(notion, databaseId) {
   }
 }
 
+async function fillApprovalStatusFromStatus(notion, databaseId) {
+  try {
+    const response = await notion.databases.query({ database_id: databaseId });
+    let updated = 0;
+    for (const page of response.results) {
+      const approval = page.properties["Approval Status"]?.select;
+      const status = page.properties["Status"]?.status?.name;
+      if (!approval && status) {
+        const mapped = ["Pending", "Approved", "Rejected"].includes(status)
+          ? status
+          : "Pending";
+        try {
+          await notion.pages.update({
+            page_id: page.id,
+            properties: { "Approval Status": { select: { name: mapped } } },
+          });
+          updated++;
+        } catch (err) {
+          console.error(
+            `Failed to update Approval Status for page ${page.id}:`,
+            err.body || err,
+          );
+        }
+      }
+    }
+    console.log(
+      `fillApprovalStatusFromStatus: updated ${updated} pages in DB ${databaseId}`,
+    );
+    return true;
+  } catch (err) {
+    console.error("Error in fillApprovalStatusFromStatus:", err.body || err);
+    return false;
+  }
+}
+
 module.exports = {
   updateDatabaseSchema,
   migrateDatabase,
+  fillApprovalStatusFromStatus,
 };

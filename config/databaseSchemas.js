@@ -33,6 +33,15 @@ const VIEWER_SCHEMA = {
     "Suggested by": {
       rich_text: {},
     },
+    "Approval Status": {
+      select: {
+        options: [
+          { name: "Pending", color: "yellow" },
+          { name: "Approved", color: "green" },
+          { name: "Rejected", color: "red" },
+        ],
+      },
+    },
     Role: {
       select: {
         options: [

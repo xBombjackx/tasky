@@ -11,6 +11,7 @@ const setupRoutes = require("./config/setupRoutes");
 const {
   updateDatabaseSchema,
   migrateDatabase,
+  fillApprovalStatusFromStatus,
 } = require("./config/databaseMigration");
 const { STREAMER_SCHEMA, VIEWER_SCHEMA } = require("./config/databaseSchemas");
 const {
@@ -38,6 +39,18 @@ const notion = new Client({ auth: NOTION_API_KEY });
 // --- Middleware ---
 app.use(cors()); // Allow requests from the Twitch extension frontend
 app.use(express.json()); // Allow the server to parse JSON request bodies
+
+// Simple request logger to aid debugging during local development
+app.use((req, res, next) => {
+  try {
+    console.log(`[HTTP] ${req.method} ${req.path} - headers:`, {
+      authorization: req.headers.authorization ? "<redacted>" : undefined,
+    });
+  } catch (err) {
+    // ignore logging errors
+  }
+  next();
+});
 
 // Initialize config store
 configStore.init().catch(console.error);
@@ -111,7 +124,9 @@ app.post("/setup", verifyTwitchJWT, async (req, res) => {
 
     // Save database IDs to config
     // This is a placeholder for the actual Twitch Configuration Service call
-    console.log(`Saving to Twitch Config Service: streamerDbId=${streamerDbId}, viewerDbId=${viewerDbId}`);
+    console.log(
+      `Saving to Twitch Config Service: streamerDbId=${streamerDbId}, viewerDbId=${viewerDbId}`,
+    );
 
     res.json({
       message: "Setup completed successfully",
@@ -148,7 +163,7 @@ app.get("/config", verifyTwitchJWT, async (req, res) => {
       role: "external",
       channel_id: channelId,
     },
-    Buffer.from(process.env.TWITCH_EXTENSION_SECRET, "base64")
+    Buffer.from(process.env.TWITCH_EXTENSION_SECRET, "base64"),
   );
 
   try {
@@ -166,7 +181,9 @@ app.get("/config", verifyTwitchJWT, async (req, res) => {
       const config = JSON.parse(data[0].content);
       res.json(config);
     } else {
-      res.status(response.status).json({ message: "Failed to fetch configuration." });
+      res
+        .status(response.status)
+        .json({ message: "Failed to fetch configuration." });
     }
   } catch (error) {
     console.error("Error fetching configuration:", error);
@@ -188,18 +205,53 @@ app.get("/tasks", verifyTwitchJWT, async (req, res) => {
       },
     });
 
-    if (!configResponse.ok) {
-      throw new Error("Failed to fetch configuration for tasks.");
+    let streamerDbId = STREAMER_DATABASE_ID;
+    let viewerDbId = VIEWER_DATABASE_ID;
+
+    if (configResponse.ok) {
+      try {
+        const config = await configResponse.json();
+        // prefer IDs from the Twitch config, but fall back to env vars
+        streamerDbId = config.streamerDbId || streamerDbId;
+        viewerDbId = config.viewerDbId || viewerDbId;
+      } catch (parseErr) {
+        console.warn(
+          "/config returned invalid JSON; falling back to env DB IDs.",
+          parseErr.message || parseErr,
+        );
+      }
+    } else {
+      console.warn(
+        `Failed to fetch configuration from Twitch (status ${configResponse.status}). Falling back to environment DB IDs.`,
+      );
     }
 
-    const config = await configResponse.json();
-    const { streamerDbId, viewerDbId } = config;
+    console.log(
+      `[EBS] Using streamerDbId=${streamerDbId}, viewerDbId=${viewerDbId} to fetch tasks`,
+    );
 
-    const tasks = await getTasksForOverlay(streamerDbId, viewerDbId);
+    let tasks;
+    try {
+      tasks = await getTasksForOverlay(streamerDbId, viewerDbId);
+    } catch (getErr) {
+      console.error(
+        "[EBS] Error while getting tasks for overlay:",
+        getErr.stack || getErr,
+      );
+      // rethrow so outer catch will return 500
+      throw getErr;
+    }
+
     res.json(tasks);
   } catch (error) {
-    console.error("[EBS] CRITICAL ERROR in /tasks route:", error);
-    res.status(500).json({ message: "Internal server error." });
+    console.error(
+      "[EBS] CRITICAL ERROR in /tasks route:",
+      error,
+      error.stack || "no stack",
+    );
+    res
+      .status(500)
+      .json({ message: "Internal server error.", error: error.message });
   }
 });
 
@@ -208,7 +260,19 @@ app.post("/tasks", verifyTwitchJWT, async (req, res) => {
   const { taskDescription } = req.body;
 
   if (!taskDescription || taskDescription.trim().length === 0) {
-    return res.status(400).json({ message: "Task description cannot be empty." });
+    return res
+      .status(400)
+      .json({ message: "Task description cannot be empty." });
+  }
+
+  // Block clearly prohibited content immediately to protect viewers and streamers
+  if (containsProhibited(taskDescription)) {
+    console.warn(
+      `[EBS] Rejected submission from ${req.twitch.opaque_user_id} due to prohibited content: ${taskDescription}`,
+    );
+    return res.status(400).json({
+      message: "Task contains prohibited content and was not submitted.",
+    });
   }
 
   const channelId = req.twitch.channel_id;
@@ -243,6 +307,25 @@ app.put("/tasks/:pageId/approve", verifyTwitchJWT, async (req, res) => {
   );
 
   try {
+    // Fetch the page to inspect the title before approving
+    const page = await notion.pages.retrieve({ page_id: pageId });
+    const title = page.properties.Task?.title[0]?.plain_text || "";
+    if (containsProhibited(title)) {
+      // Auto-reject prohibited content to avoid showing it even when a moderator attempts approval
+      await notion.pages.update({
+        page_id: pageId,
+        archived: true,
+        properties: { "Approval Status": { select: { name: "Rejected" } } },
+      });
+      console.warn(
+        `[EBS] Auto-rejected approval of prohibited task ${pageId}: ${title}`,
+      );
+      return res.status(400).json({
+        message:
+          "Task contains prohibited content and was rejected by the system.",
+      });
+    }
+
     await notion.pages.update({
       page_id: pageId,
       properties: {
@@ -255,9 +338,80 @@ app.put("/tasks/:pageId/approve", verifyTwitchJWT, async (req, res) => {
     res.status(500).json({ message: "Error approving task." });
   }
 });
+
+// PUT /tasks/:pageId/complete - Moderator/Broadcaster can mark a specific page as completed
+app.put("/tasks/:pageId/complete", verifyTwitchJWT, async (req, res) => {
+  const { pageId } = req.params;
+  const { completed } = req.body;
+
+  // Only broadcaster or moderator may mark arbitrary pages complete
+  if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
+    return res
+      .status(403)
+      .send(
+        "Forbidden: Only moderators or the broadcaster can mark tasks complete.",
+      );
+  }
+
+  if (typeof completed !== "boolean") {
+    return res
+      .status(400)
+      .json({ message: "Request body must include boolean 'completed'." });
+  }
+
+  try {
+    await notion.pages.update({
+      page_id: pageId,
+      properties: { Completed: { checkbox: completed } },
+    });
+    res.json({
+      message: `Task ${pageId} marked as ${completed ? "completed" : "not completed"}.`,
+    });
+  } catch (error) {
+    console.error("Error updating task completion in Notion:", error);
+    res.status(500).json({ message: "Error updating task completion." });
+  }
+});
+
+// PUT /tasks/me/complete - A viewer can mark their own approved task as completed
+app.put("/tasks/me/complete", verifyTwitchJWT, async (req, res) => {
+  const opaque = req.twitch.opaque_user_id;
+  const { completed } = req.body;
+
+  if (typeof completed !== "boolean") {
+    return res
+      .status(400)
+      .json({ message: "Request body must include boolean 'completed'." });
+  }
+
+  try {
+    const msg = await updateViewerTaskStatus(opaque, completed);
+    res.json({ message: msg });
+  } catch (error) {
+    console.error("Error updating viewer task status:", error);
+    res.status(500).json({ message: "Error updating viewer task status." });
+  }
+});
 // --- Notion Helper Functions ---
 
 const dataSourceCache = new Map();
+
+// Simple prohibited content checker. Keep this list conservative and update as needed.
+const PROHIBITED_PATTERNS = [
+  /kill\s+yourself/i,
+  /kill\s+your\s+self/i,
+  /suicid/i,
+  /die\s+yourself/i,
+  /go\s+die/i,
+];
+
+function containsProhibited(text) {
+  if (!text || typeof text !== "string") return false;
+  for (const rx of PROHIBITED_PATTERNS) {
+    if (rx.test(text)) return true;
+  }
+  return false;
+}
 
 async function getDataSourceId(databaseId) {
   if (dataSourceCache.has(databaseId)) {
@@ -286,7 +440,8 @@ async function findUserTask(opaque_user_id, approvalStatus) {
   const dataSourceId = await getDataSourceId(VIEWER_DATABASE_ID);
   if (!dataSourceId) return null;
   try {
-    const response = await notion.dataSources.query({
+    // First try to find by the new `Approval Status` property (select)
+    let response = await notion.dataSources.query({
       data_source_id: dataSourceId,
       filter: {
         and: [
@@ -295,6 +450,22 @@ async function findUserTask(opaque_user_id, approvalStatus) {
         ],
       },
     });
+
+    if (response.results && response.results.length > 0) {
+      return response.results[0];
+    }
+
+    // Fallback: some installs use the `Status` property instead of `Approval Status`.
+    response = await notion.dataSources.query({
+      data_source_id: dataSourceId,
+      filter: {
+        and: [
+          { property: "Suggested by", rich_text: { equals: opaque_user_id } },
+          { property: "Status", status: { equals: approvalStatus } },
+        ],
+      },
+    });
+
     return response.results.length > 0 ? response.results[0] : null;
   } catch (error) {
     console.error(
@@ -316,11 +487,15 @@ async function addViewerTask(opaque_user_id, taskDescription) {
         Task: { title: [{ text: { content: taskDescription } }] },
         "Suggested by": { rich_text: [{ text: { content: opaque_user_id } }] },
         Status: { status: { name: "Pending" } },
+        // Also set Approval Status (new select) to Pending so older DBs don't have nulls
+        "Approval Status": { select: { name: "Pending" } },
         Completed: { checkbox: false },
         Role: { select: { name: "Viewer" } },
       },
     });
-    console.log(`[NOTION] Added task for ${opaque_user_id}: "${taskDescription}"`);
+    console.log(
+      `[NOTION] Added task for ${opaque_user_id}: "${taskDescription}"`,
+    );
   } catch (error) {
     console.error("[NOTION] Error adding task:", error.body || error);
   }
@@ -354,7 +529,9 @@ async function updateViewerTaskStatus(opaque_user_id, isComplete) {
   if (task) {
     await notion.pages.update({
       page_id: task.id,
-      properties: { Status: { checkbox: isComplete } },
+      // Mark the task as completed by toggling the `Completed` checkbox.
+      // `Status` is a status property in the viewer DB; `Completed` is the boolean flag.
+      properties: { Completed: { checkbox: isComplete } },
     });
     const statusText = isComplete ? "completed" : "reset to active";
     console.log(`[NOTION] Task for ${opaque_user_id} marked as ${statusText}`);
@@ -389,18 +566,39 @@ async function getTasksForOverlay(streamerDbId, viewerDbId) {
       id: page.id,
       type: "streamer",
       title: page.properties.Task?.title[0]?.plain_text || "Untitled Task",
-      status: page.properties.Status?.status?.name || "Not started",
+      // Some installations use `State` in the streamer DB while others use `Status`.
+      // Prefer `State` (as configured in `STREAMER_SCHEMA`) but fall back to `Status`.
+      status:
+        page.properties.State?.status?.name ||
+        page.properties.Status?.status?.name ||
+        "Not started",
     }));
 
-    const viewerTasks = viewerResponse.results.map((page) => ({
-      id: page.id,
-      type: "viewer",
-      title: page.properties.Task?.title[0]?.plain_text || "Untitled Task",
-      submitter:
-        page.properties["Suggested by"]?.rich_text[0]?.plain_text || "Unknown",
-      role: page.properties.Role?.select?.name || "Viewer",
-      status: page.properties.Status?.status?.name || "Pending",
-    }));
+    const viewerTasks = viewerResponse.results
+      .map((page) => {
+        const title =
+          page.properties.Task?.title[0]?.plain_text || "Untitled Task";
+        return {
+          id: page.id,
+          type: "viewer",
+          title,
+          submitter:
+            page.properties["Suggested by"]?.rich_text[0]?.plain_text ||
+            "Unknown",
+          role: page.properties.Role?.select?.name || "Viewer",
+          status: page.properties.Status?.status?.name || "Pending",
+        };
+      })
+      // filter out results with prohibited content so overlay never shows harmful phrases
+      .filter((t) => {
+        if (containsProhibited(t.title)) {
+          console.warn(
+            `[EBS] Hiding prohibited viewer task from overlay: ${t.id} - ${t.title}`,
+          );
+          return false;
+        }
+        return true;
+      });
 
     return { streamerTasks, viewerTasks };
   } catch (error) {
@@ -416,12 +614,35 @@ async function getTasksForOverlay(streamerDbId, viewerDbId) {
 async function initializeServer() {
   if (STREAMER_DATABASE_ID && VIEWER_DATABASE_ID) {
     console.log("Updating database schemas...");
-    await updateDatabaseSchema(notion, STREAMER_DATABASE_ID, STREAMER_SCHEMA);
-    await updateDatabaseSchema(notion, VIEWER_DATABASE_ID, VIEWER_SCHEMA);
+    const streamerSchemaOk = await updateDatabaseSchema(
+      notion,
+      STREAMER_DATABASE_ID,
+      STREAMER_SCHEMA,
+    );
+    const viewerSchemaOk = await updateDatabaseSchema(
+      notion,
+      VIEWER_DATABASE_ID,
+      VIEWER_SCHEMA,
+    );
 
     console.log("Migrating existing data...");
-    await migrateDatabase(notion, STREAMER_DATABASE_ID);
-    await migrateDatabase(notion, VIEWER_DATABASE_ID);
+    if (streamerSchemaOk) {
+      await migrateDatabase(notion, STREAMER_DATABASE_ID, STREAMER_SCHEMA);
+    } else {
+      console.warn(
+        "Skipping streamer DB page migration because schema update failed or database is missing properties.",
+      );
+    }
+
+    if (viewerSchemaOk) {
+      await migrateDatabase(notion, VIEWER_DATABASE_ID, VIEWER_SCHEMA);
+      // Ensure Approval Status is populated from existing Status values so older pages remain functional
+      await fillApprovalStatusFromStatus(notion, VIEWER_DATABASE_ID);
+    } else {
+      console.warn(
+        "Skipping viewer DB page migration because schema update failed or database is missing properties.",
+      );
+    }
   }
 
   app.listen(PORT, () => {
@@ -432,3 +653,18 @@ async function initializeServer() {
 }
 
 initializeServer().catch(console.error);
+
+// Debug-only endpoint to fetch tasks directly using env DB IDs (no auth).
+// This helps debugging local setups without needing a Twitch JWT.
+app.get("/_debug/tasks-local", async (req, res) => {
+  try {
+    const tasks = await getTasksForOverlay(
+      STREAMER_DATABASE_ID,
+      VIEWER_DATABASE_ID,
+    );
+    res.json(tasks);
+  } catch (err) {
+    console.error("[DEBUG] Failed to get tasks locally:", err.stack || err);
+    res.status(500).json({ message: "Debug fetch failed", error: err.message });
+  }
+});

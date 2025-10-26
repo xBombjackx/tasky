@@ -276,7 +276,7 @@ app.post("/tasks", verifyTwitchJWT, async (req, res) => {
   }
 
   const channelId = req.twitch.channel_id;
-  // Use the opaque_user_id as the "username" to track who submitted it
+  // Use the opaque_user_id to track who submitted the task
   const submitterId = req.twitch.opaque_user_id;
   console.log(
     `[EBS] User ${submitterId} is submitting task: "${taskDescription}" for channel: ${channelId}`,

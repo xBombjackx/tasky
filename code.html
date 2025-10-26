@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="themes.css">
 <script>
       const urlParams = new URLSearchParams(window.location.search);
       // We'll define the EBS_URL globally based on the 'local' param.
@@ -28,15 +29,15 @@
             theme: {
                 extend: {
                     colors: {
-                        "primary": "#53a8b6",
-                        "background-light": "#f6f5f8",
-                        "background-dark": "#3a4f6a",
-                        "text-light": "#bbe4e9",
-                        "text-muted": "#79c2d0",
-                        "border-color": "#5585b5",
-                        "vip-glow": "#f6d55c",
-                        "vip-bg": "rgba(246, 213, 92, 0.1)",
-                        "subscriber": "#d68fd6",
+                        "primary": "var(--primary)",
+                        "background-light": "var(--background-light)",
+                        "background-dark": "var(--background-dark)",
+                        "text-light": "var(--text-light)",
+                        "text-muted": "var(--text-muted)",
+                        "border-color": "var(--border-color)",
+                        "vip-glow": "var(--vip-glow)",
+                        "vip-bg": "var(--vip-bg)",
+                        "subscriber": "var(--subscriber)",
                     },
                     fontFamily: {
                         "display": ["Inter"]
@@ -51,54 +52,17 @@
             },
         }
     </script>
-    <style>
-      @property --gradient-angle {
-        syntax: "<angle>";
-        initial-value: 0deg;
-        inherits: false;
-      }
-      @keyframes gradient-spin {
-        to { --gradient-angle: 360deg; }
-      }
-      .vip-task::before {
-        content: '';
-        position: absolute;
-        z-index: -1;
-        inset: -2px; /* Border thickness */
-        border-radius: 1rem; /* Matches rounded-lg in your config */
-        background: conic-gradient(from var(--gradient-angle), #d68fd6, #f6d55c, #53a8b6, #d68fd6);
-        animation: gradient-spin 4s linear infinite;
-      }
-      .vip-task span, .vip-task p {
-        /* Add a subtle outline using text-shadow to improve readability against the animated border */
-        text-shadow: 0 0 4px #3a4f6a, 0 0 4px #3a4f6a;
-      }
-      /* Custom Scrollbar for Webkit browsers */
-      #viewer-tasks::-webkit-scrollbar {
-        width: 6px;
-      }
-      #viewer-tasks::-webkit-scrollbar-track {
-        background: transparent;
-        border-radius: 3px;
-      }
-      #viewer-tasks::-webkit-scrollbar-thumb {
-        background-color: #5585b5; /* border-color */
-        border-radius: 3px;
-      }
-      #viewer-tasks::-webkit-scrollbar-thumb:hover {
-        background-color: #53a8b6; /* primary */
-      }
 
-      /* Style for completed tasks */
-      .group:has(input:checked) {
-        filter: grayscale(80%) brightness(0.7);
-        opacity: 0.7;
-        transition: filter 0.3s ease, opacity 0.3s ease;
-      }
-    </style>
   </head>
 <body class="bg-background-light dark:bg-background-dark font-display">
 <div class="relative min-h-screen p-4 sm:p-6 lg:p-8 flex items-start justify-end">
+    <div class="absolute top-5 left-5 z-10">
+        <select id="theme-switcher" class="bg-background-dark/80 text-text-light rounded-lg border-border-color/50 focus:ring-primary focus:border-primary">
+            <option value="">Default</option>
+            <option value="forest">Forest</option>
+            <option value="midnight">Midnight</option>
+        </select>
+    </div>
 <div class="w-full max-w-sm bg-background-dark/80 dark:bg-background-dark/80 backdrop-blur-xl rounded-xl border border-border-color/50 shadow-2xl shadow-primary/10 flex flex-col gap-5 text-text-light p-5">
 <div class="flex flex-col gap-2">
 <div class="flex justify-between items-baseline">
@@ -280,6 +244,11 @@
 
       twitch.onContext((context, changed) => {
         // console.log('Context changed:', context);
+      });
+
+      const themeSwitcher = document.getElementById('theme-switcher');
+      themeSwitcher.addEventListener('change', (event) => {
+        document.documentElement.setAttribute('data-theme', event.target.value);
       });
     </script>
 </body></html>

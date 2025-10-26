@@ -4,13 +4,13 @@
             100% { background-position: 400px 0; }
           }
           @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 12px 2px rgba(246, 213, 92, 0.4); }
-            50% { box-shadow: 0 0 20px 6px rgba(246, 213, 92, 0.6); }
+            0%, 100% { box-shadow: 0 0 12px 2px rgba(var(--vip-glow-rgb), 0.4); }
+            50% { box-shadow: 0 0 20px 6px rgba(var(--vip-glow-rgb), 0.6); }
           }
           @keyframes text-shine {
-            0% { color: #f6d55c; }
-            50% { color: #fff; }
-            100% { color: #f6d55c; }
+            0% { color: var(--vip-glow); }
+            50% { color: var(--text-light); }
+            100% { color: var(--vip-glow); }
           }
 
           .vip-task .vip-text {
@@ -25,9 +25,53 @@
         }
         input[type="checkbox"]:checked+p {
             text-decoration: line-through;
-            color: #79c2d0;
+            color: var(--text-muted);
         }
         input[type="checkbox"]:checked+div>label {
             text-decoration: line-through;
-            color: #79c2d0;
+            color: var(--text-muted);
         }
+
+      @property --gradient-angle {
+        syntax: "<angle>";
+        initial-value: 0deg;
+        inherits: false;
+      }
+      @keyframes gradient-spin {
+        to { --gradient-angle: 360deg; }
+      }
+      .vip-task::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        inset: -2px; /* Border thickness */
+        border-radius: 1rem; /* Matches rounded-lg in your config */
+        background: conic-gradient(from var(--gradient-angle), var(--subscriber), var(--vip-glow), var(--primary), var(--subscriber));
+        animation: gradient-spin 4s linear infinite;
+      }
+      .vip-task span, .vip-task p {
+        /* Add a subtle outline using text-shadow to improve readability against the animated border */
+        text-shadow: 0 0 4px var(--background-dark), 0 0 4px var(--background-dark);
+      }
+      /* Custom Scrollbar for Webkit browsers */
+      #viewer-tasks::-webkit-scrollbar {
+        width: 6px;
+      }
+      #viewer-tasks::-webkit-scrollbar-track {
+        background: transparent;
+        border-radius: 3px;
+      }
+      #viewer-tasks::-webkit-scrollbar-thumb {
+        background-color: var(--border-color);
+        border-radius: 3px;
+      }
+      #viewer-tasks::-webkit-scrollbar-thumb:hover {
+        background-color: var(--primary);
+      }
+
+      /* Style for completed tasks */
+      .group:has(input:checked) {
+        filter: grayscale(80%) brightness(0.7);
+        opacity: 0.7;
+        transition: filter 0.3s ease, opacity 0.3s ease;
+      }

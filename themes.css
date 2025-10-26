@@ -1,0 +1,43 @@
+/* themes.css */
+
+/* Default Theme */
+:root {
+  --primary: #53a8b6;
+  --background-light: #f6f5f8;
+  --background-dark: #3a4f6a;
+  --text-light: #bbe4e9;
+  --text-muted: #79c2d0;
+  --border-color: #5585b5;
+  --vip-glow: #f6d55c;
+  --vip-glow-rgb: 246, 213, 92;
+  --vip-bg: rgba(246, 213, 92, 0.1);
+  --subscriber: #d68fd6;
+}
+
+/* Forest Theme */
+[data-theme="forest"] {
+  --primary: #4a7c59;
+  --background-light: #f0f2eb;
+  --background-dark: #2c3e32;
+  --text-light: #d9e0d3;
+  --text-muted: #a3b59f;
+  --border-color: #6a8b79;
+  --vip-glow: #f2c94c;
+  --vip-glow-rgb: 242, 201, 76;
+  --vip-bg: rgba(242, 201, 76, 0.1);
+  --subscriber: #b19cd9;
+}
+
+/* Midnight Theme */
+[data-theme="midnight"] {
+    --primary: #8a79a8;
+    --background-light: #e9e7f0;
+    --background-dark: #2c2a3e;
+    --text-light: #dcd9e6;
+    --text-muted: #a8a2b7;
+    --border-color: #5c5470;
+    --vip-glow: #f7b801;
+    --vip-glow-rgb: 247, 184, 1;
+    --vip-bg: rgba(247, 184, 1, 0.1);
+    --subscriber: #c780e6;
+}

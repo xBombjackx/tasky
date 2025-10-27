@@ -1,51 +1,69 @@
-# Project TODO List: Collaborative Notion Tasker
+# Code Review Findings and Recommendations
 
-This file tracks the development tasks for the Twitch Extension, based on the initial code review and the PDD.
+## Security
 
-## High Priority: Code Review Refactors
+### 1. **Hardcoded Localhost URL in `config.js`**
+- **Issue:** The `config.js` file contains a hardcoded `localhost` URL for the setup endpoint, which will fail in production.
+- **Impact:** The setup process will not work when the extension is deployed.
+- **Recommendation:** Replace the hardcoded URL with a relative path or an environment variable to ensure it functions correctly in a production environment.
 
-These tasks address items from the code review and should be completed before building major new features.
+### 2. **Lack of Input Validation and Sanitization**
+- **Issue:** The `addViewerTask` and `getTasksForOverlay` functions in `ebs.js` do not properly validate or sanitize user-provided task descriptions. While there is a basic `containsProhibited` check, it is not comprehensive.
+- **Impact:** Malicious users could inject harmful content or scripts (XSS), leading to security vulnerabilities.
+- **Recommendation:** Implement robust input validation and sanitization for all user-provided data to prevent injection attacks.
 
-- [x] **[ebs.js]** **Critical:** Update all user-related functions (`POST /tasks`, `findUserTask`, etc.) to consistently use the `opaque_user_id` as the unique identifier for viewers, not `username`.
-- [x] **[ebs.js]** Ensure the Notion "Submitter" column is configured to store the `opaque_user_id` when a task is created via `POST /tasks`.
-- [x] **[ebs.js]** Add input validation to the `POST /tasks` endpoint to sanitize `taskDescription` and prevent potential injection attacks.
-- [x] **[ebs.js]** Correct the schema mismatch in `getTasksForOverlay` to use `"Status"` instead of `"State"` when querying for streamer tasks.
-- [x] **[ebs.js]** Add `await` to the `updateDatabaseSchema` and `migrateDatabase` calls in the `initializeServer` function to prevent race conditions.
-- [x] **[code.html]** Improve frontend error handling in `fetchTasks` to display a user-friendly "Could not load tasks" message on failure, rather than just logging to the console.
-- [x] **[code.html]** Remove the redundant `updateCounterFromDOM` function and rely solely on `updateTaskCounter` for better performance.
-- [x] **[ebs.js]** **Architecture:** Transition from using `.env` variables for database IDs to storing and retrieving them from the Twitch Configuration Service. This will better support multi-broadcaster setups.
-- [ ] **[ebs.js]** **Architecture:** Replace `console.log` placeholders with actual calls to the Twitch Configuration Service to store and retrieve database IDs.
+### 3. **Missing `package-lock.json`**
+- **Issue:** The `package-lock.json` file is missing from the repository.
+- **Impact:** This can lead to inconsistent dependency versions across different environments, making the application vulnerable to security risks from outdated packages.
+- **Recommendation:** Generate and commit a `package-lock.json` file to ensure dependency integrity.
 
-## Phase 1: Core Backend & Read-Only Overlay
+### 4. **Insecure JWT Handling**
+- **Issue:** JWTs are not consistently handled with best security practices. The `verifyTwitchJWT` function does not check the `aud` (audience) or `iss` (issuer) claims.
+- **Impact:** The application may be vulnerable to token substitution attacks.
+- **Recommendation:** Enhance JWT validation to include checks for `aud` and `iss` claims.
 
-- [ ] **[code.html]** Build out the UI to fetch and render the `streamerTasks` and `viewerTasks` lists from the `GET /tasks` endpoint.
-- [ ] **[code.html]** Style the overlay to be clean, readable, and respect the 3-task limit for the viewer list.
+## Performance
 
-## Phase 2: Viewer Submission & Moderation
+### 1. **Inefficient `findUserTask` Function**
+- **Issue:** The `findUserTask` function in `ebs.js` performs multiple sequential queries to find a user's task, which can be inefficient.
+- **Impact:** Increased latency and slower response times, especially with a large number of tasks.
+- **Recommendation:** Optimize the function by combining queries or using a more efficient query structure to reduce the number of round trips to the database.
 
-- [ ] **[NEW FILE]** Create `panel.html` to serve as the Twitch Extension Panel.
-- [ ] **[panel.html]** Implement the `twitch.onAuthorized` auth flow, similar to the overlay.
-- [ ] **[panel.html]** Build a simple form (e.g., "Task Title") for task submission.
-- [ ] **[panel.html]** Add JavaScript to `panel.html` to send the new task data to the `POST /tasks` endpoint, including the auth token.
-- [ ] **[NEW FILE]** Create `config.html` to serve as the Twitch Live Config Panel for moderators/streamers.
-- [ ] **[ebs.js]** Create a new endpoint, e.g., `GET /tasks/pending`, that fetches tasks from the Viewer Notion DB with the "Pending" status (requires `verifyTwitchJWT` and a role check for 'moderator' or 'broadcaster').
-- [ ] **[config.html]** Implement auth and fetch logic to call `GET /tasks/pending` and display the list of tasks awaiting approval.
-- [ ] **[config.html]** Add "Approve" and "Reject" buttons for each task, which call the existing `PUT /tasks/:pageId/approve` endpoint (or a new `DELETE /tasks/:pageId` endpoint for rejection).
+### 2. **Unnecessary `fetchTasks` Calls**
+- **Issue:** The `fetchTasks` function is called multiple times in `code.html`, leading to redundant data fetching.
+- **Impact:** Unnecessary network requests and increased load on the backend.
+- **Recommendation:** Cache the task data on the frontend and update it only when necessary to reduce redundant API calls.
 
-## Phase 3: Task Lifecycle & Progress Rewards
+## Maintainability
 
-- [ ] **[panel.html]** Add a "My Task" view to the panel, which fetches and displays the user's currently "Approved" but incomplete task.
-- [ ] **[panel.html]** Add a "Mark Complete" button to this view.
-- [ ] **[ebs.js]** Create a new endpoint `PUT /tasks/complete` (or similar) that finds the user's active task (via their `opaque_user_id`) and marks its "Status" as complete in Notion.
-- [ ] **[ebs.js]** Integrate the Twitch Configuration Service. On _any_ task completion (streamer or viewer), increment a `Progress_Points` value in the broadcaster's config segment.
-- [ ] **[ebs.js]** Create a new _unauthenticated_ endpoint `GET /progress` that reads the `Progress_Points` from the Twitch Config Service (so the overlay can fetch it without a user JWT).
-- [ ] **[code.html]** Build the "Focus Bar" UI element.
-- [ ] **[code.html]** Add logic to periodically fetch from `GET /progress` and update the fill of the Focus Bar.
-- [ ] **[ebs.js]** Add logic to the task completion endpoint to check if `Progress_Points` has crossed a Tier threshold (3, 7, 12).
-- [ ] **[ebs.js]** If a Tier is met, use the Twitch API (with an App Access Token) to send an automated congratulatory chat message.
-- [ ] **[code.html]** Add a simple CSS animation or visual cue that triggers when the progress bar hits a new Tier.
+### 1. **Lack of Automated Testing**
+- **Issue:** The project has no automated tests, making it difficult to verify changes and prevent regressions.
+- **Impact:** Increased risk of introducing bugs and higher maintenance overhead.
+- **Recommendation:** Implement a testing framework (e.g., Jest, Mocha) and add unit, integration, and end-to-end tests to ensure code quality.
 
-## Future (Post-MVP)
+### 2. **Inconsistent Error Handling**
+- **Issue:** Error handling is inconsistent across the application. Some functions have detailed error handling, while others do not.
+- **Impact:** Difficult to debug issues and provide a consistent user experience.
+- **Recommendation:** Standardize error handling by creating a centralized error-handling middleware in `ebs.js`.
 
-- [ ] Explore Channel Points integration for "Priority Tasks".
-- [ ] Investigate a chat-bot component for `!stats` or viewer presence tracking.
+### 3. **Redundant Code in `ebs.js`**
+- **Issue:** The `ebs.js` file contains redundant code for fetching and updating tasks, which could be refactored into reusable functions.
+- **Impact:** Increased code complexity and maintenance effort.
+- **Recommendation:** Refactor the code to eliminate redundancy and improve modularity.
+
+### 4. **Missing Environment Variable Documentation**
+- **Issue:** The `.env` file is not documented, making it difficult for new developers to set up the project.
+- **Impact:** Slower onboarding and potential configuration errors.
+- **Recommendation:** Create an `.env.example` file with placeholder values and comments to document the required environment variables.
+
+## User Experience
+
+### 1. **Lack of Real-Time Updates**
+- **Issue:** The task list does not update in real-time when changes occur in Notion.
+- **Impact:** Users may see outdated information, leading to a poor user experience.
+- **Recommendation:** Implement a real-time update mechanism using WebSockets or periodic polling to keep the frontend synchronized with the backend.
+
+### 2. **Unintuitive Setup Process**
+- **Issue:** The setup process in `config.html` requires manual entry of database IDs, which is not user-friendly.
+- **Impact:** The setup process is cumbersome and prone to errors.
+- **Recommendation:** Improve the setup process by providing a more guided and automated experience, such as a one-click setup button.

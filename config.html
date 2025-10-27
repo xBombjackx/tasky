@@ -5,6 +5,22 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>Tasky - Configuration</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#53a8b6",
+              "background-light": "#f6f5f8",
+              "background-dark": "#3a4f6a",
+              "text-light": "#bbe4e9",
+              "text-muted": "#79c2d0",
+              "border-color": "#5585b5",
+            },
+          },
+        },
+      };
+    </script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap"
       rel="stylesheet"
@@ -23,11 +39,39 @@
     <div class="max-w-2xl mx-auto">
       <h1 class="text-3xl font-bold mb-8">Tasky Configuration</h1>
 
+      <!-- Initial Setup Section -->
+      <div
+        class="bg-background-dark/80 rounded-xl border border-border-color/50 p-6 mb-6"
+      >
+        <h2 class="text-xl font-semibold mb-4">Initial Setup</h2>
+        <p class="text-sm text-text-light/70 mb-4">
+          If you haven't set up your databases yet, paste your Notion page ID
+          below and click Create. This will create the two required databases
+          inside that page.
+        </p>
+        <div class="flex items-center space-x-4">
+          <input
+            type="text"
+            id="parentPageId"
+            class="w-full bg-background-light border-border-color/50 rounded-lg focus:ring-primary focus:border-primary text-gray-900 placeholder:text-gray-500"
+            placeholder="Enter Notion Page ID or URL here..."
+          />
+          <button
+            id="create-dbs"
+            onclick="createDatabases()"
+            class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/80 transition-colors whitespace-nowrap"
+          >
+            Create Databases
+          </button>
+        </div>
+        <p id="setup-status" class="text-sm mt-4"></p>
+      </div>
+
       <!-- Database Setup Section -->
       <div
         class="bg-background-dark/80 rounded-xl border border-border-color/50 p-6 mb-6"
       >
-        <h2 class="text-xl font-semibold mb-4">Database Setup</h2>
+        <h2 class="text-xl font-semibold mb-4">Database IDs</h2>
 
         <div id="database-setup" class="space-y-4">
           <div class="mb-4">
@@ -37,8 +81,8 @@
             <input
               type="text"
               id="streamerDbId"
-              class="w-full bg-background-light border-border-color/50 rounded-lg focus:ring-primary focus:border-primary"
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              class="w-full bg-background-light border-border-color/50 rounded-lg focus:ring-primary focus:border-primary text-gray-900 placeholder:text-gray-500"
+              placeholder="Will be populated after creation..."
             />
           </div>
           <div class="mb-4">
@@ -48,8 +92,8 @@
             <input
               type="text"
               id="viewerDbId"
-              class="w-full bg-background-light border-border-color/50 rounded-lg focus:ring-primary focus:border-primary"
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              class="w-full bg-background-light border-border-color/50 rounded-lg focus:ring-primary focus:border-primary text-gray-900 placeholder:text-gray-500"
+              placeholder="Will be populated after creation..."
             />
           </div>
         </div>

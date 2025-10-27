@@ -1,5 +1,7 @@
 // config.js
 window.Twitch.ext.onAuthorized(function (auth) {
+  // Store auth token for later use by other functions
+  window.twitchAuth = auth;
   fetchConfiguration(auth.token);
 });
 
@@ -14,10 +16,15 @@ function fetchConfiguration(token) {
   })
     .then((response) => response.json())
     .then((data) => {
-      if (data) {
+      if (data && data.streamerDbId) {
         document.getElementById("streamerDbId").value = data.streamerDbId;
+      }
+      if (data && data.viewerDbId) {
         document.getElementById("viewerDbId").value = data.viewerDbId;
       }
+    })
+    .catch((err) => {
+      console.error("Error fetching configuration:", err);
     });
 }
 
@@ -27,10 +34,99 @@ function saveConfiguration() {
 
   window.Twitch.ext.configuration.set(
     "broadcaster",
-    "1",
+    "1", // content version
     JSON.stringify({
       streamerDbId: streamerDbId,
       viewerDbId: viewerDbId,
     })
   );
+}
+
+function createDatabases() {
+  const userInput = document.getElementById("parentPageId").value.trim();
+  const statusEl = document.getElementById("setup-status");
+  let parentPageId = userInput;
+
+  if (userInput.startsWith("http")) {
+    try {
+      const url = new URL(userInput);
+      const path = url.pathname;
+      const id = path.substring(path.lastIndexOf("-") + 1);
+      if (id && id.length === 32) {
+        parentPageId = id;
+      } else {
+        throw new Error("Could not find a valid 32-character ID in the URL.");
+      }
+    } catch (e) {
+      statusEl.textContent = `Error: ${e.message}`;
+      statusEl.className = "text-sm mt-4 text-red-400";
+      return;
+    }
+  }
+
+  if (!parentPageId) {
+    statusEl.textContent = "Please enter a valid Notion Page ID or URL.";
+    statusEl.className = "text-sm mt-4 text-red-400";
+    return;
+  }
+
+  // Disable button and show status
+  const createBtn = document.getElementById("create-dbs");
+  createBtn.disabled = true;
+  createBtn.textContent = "Creating...";
+  statusEl.textContent = "Creating databases, please wait...";
+  statusEl.className = "text-sm mt-4 text-yellow-400";
+
+  const url = `http://localhost:8081/setup`;
+  fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // Use the stored token from onAuthorized
+      Authorization: `Bearer ${window.twitchAuth.token}`,
+    },
+    body: JSON.stringify({ parentPageId: parentPageId }),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        // Throw an error to be caught by the catch block, including server message
+        return response
+          .json()
+          .then((err) => {
+            throw new Error(err.message || "Setup failed with no error message.");
+          })
+          .catch(() => {
+            throw new Error(`Setup failed with status: ${response.status}`)
+          });
+      }
+      return response.json();
+    })
+    .then((data) => {
+      statusEl.textContent =
+        "Databases created successfully! Saving configuration...";
+      statusEl.className = "text-sm mt-4 text-green-400";
+
+      // Populate the fields with the new IDs
+      document.getElementById("streamerDbId").value = data.databases.streamer.id;
+      document.getElementById("viewerDbId").value = data.databases.viewer.id;
+
+      // Automatically save the new configuration
+      saveConfiguration();
+
+      // Let user know save is complete
+      setTimeout(() => {
+        statusEl.textContent =
+          "Setup complete! Your configuration has been saved.";
+      }, 1000);
+    })
+    .catch((error) => {
+      console.error("Setup Error:", error);
+      statusEl.textContent = `Error: ${error.message}`;
+      statusEl.className = "text-sm mt-4 text-red-400";
+    })
+    .finally(() => {
+      // Re-enable button
+      createBtn.disabled = false;
+      createBtn.textContent = "Create Databases";
+    });
 }

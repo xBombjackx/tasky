@@ -14,7 +14,14 @@ async function updateDatabaseSchema(notion, databaseId, schema) {
         !database.properties[propName] ||
         database.properties[propName].type !== Object.keys(propConfig)[0]
       ) {
-        updates[propName] = propConfig;
+        const newPropConfig = JSON.parse(JSON.stringify(propConfig));
+        // When creating a status property via databases.update, the API
+        // rejects requests that include options or groups.
+        // The property must be created with an empty status object first.
+        if (newPropConfig.status) {
+          newPropConfig.status = {};
+        }
+        updates[propName] = newPropConfig;
       }
     }
 

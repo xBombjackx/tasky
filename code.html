@@ -232,6 +232,34 @@
         }
       }
 
+      // Helper: moderator/broadcaster can mark any page complete by pageId
+      async function markPageCompleteAsMod(pageId, isComplete) {
+        if (!authToken) return false;
+        try {
+          const resp = await fetch(`${EBS_URL}/tasks/${pageId}/complete`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ completed: isComplete }),
+          });
+          if (!resp.ok) {
+            const body = await resp.json().catch(() => ({}));
+            console.warn(
+              "Failed to mark page complete as mod:",
+              resp.status,
+              body,
+            );
+            return false;
+          }
+          return true;
+        } catch (err) {
+          console.error("Error marking page complete as mod:", err);
+          return false;
+        }
+      }
+
       // Called when a viewer checkbox is toggled. If the current viewer owns the task
       // then call the /tasks/me/complete endpoint. If the user is a moderator/broadcaster
       // (decodedRole), call the moderator endpoint for the specific pageId. Otherwise
@@ -268,6 +296,29 @@
         event.target.checked = !checked;
       }
 
+      // Called when a streamer checkbox is toggled. Only moderators or the broadcaster
+      // may mark these tasks as complete.
+      async function onStreamerCheckboxChange(event, pageId) {
+        const checked = event.target.checked;
+
+        // Allow moderators/broadcaster to mark any streamer task complete
+        if (decodedRole === "broadcaster" || decodedRole === "moderator") {
+          const ok = await markPageCompleteAsMod(pageId, checked);
+          if (!ok) {
+            // revert UI change on failure
+            event.target.checked = !checked;
+          } else {
+            // refresh to pick up any changes immediately
+            await fetchTasks();
+          }
+          return;
+        }
+
+        // Otherwise, disallow marking streamer tasks
+        alert("Only the broadcaster or moderators can complete streamer tasks.");
+        event.target.checked = !checked;
+      }
+
       async function fetchTasks() {
         if (!authToken) {
           console.error("Cannot fetch tasks, not authenticated yet.");
@@ -300,12 +351,18 @@
             "<p class='text-text-muted'>Could not load tasks. Please try again later.</p>";
           streamerTasksDiv.innerHTML = errorMessage;
           viewerTasksDiv.innerHTML = errorMessage;
+        } finally {
+          // --- Real-time Updates ---
+          // Fetch tasks again after 10 seconds to keep the overlay up-to-date
+          setTimeout(fetchTasks, 10000); // 10 seconds
         }
       }
 
       function updateTaskCounter(streamerTasks, viewerTasks) {
         const allTasks = [...streamerTasks, ...viewerTasks];
-        const completedTasks = allTasks.filter((task) => task.completed).length;
+        const completedTasks = allTasks.filter(
+          (task) => task.completed || task.status === "Completed"
+        ).length;
         const totalTasks = allTasks.length;
 
         const counterEl = document.getElementById("task-counter");
@@ -323,16 +380,23 @@
       function renderStreamerTasks(tasks) {
         streamerTasksDiv.innerHTML = ""; // Clear existing tasks
         if (tasks.length === 0) {
-          streamerTasksDiv.innerHTML = "<p>No streamer tasks yet.</p>";
+          streamerTasksDiv.innerHTML =
+            "<p class='text-text-muted'>No streamer tasks yet.</p>";
           return;
         }
+
+        const canModifyStreamerTasks =
+          decodedRole === "broadcaster" || decodedRole === "moderator";
+
         tasks.forEach((task) => {
           const el = document.createElement("label");
-          el.className =
-            "flex items-center gap-4 py-1.5 px-2 cursor-pointer group bg-black/20 rounded-lg";
+          el.className = `flex items-center gap-4 py-1.5 px-2 group bg-black/20 rounded-lg ${canModifyStreamerTasks ? "cursor-pointer" : "cursor-not-allowed"}`;
+
+          const checkboxDisabled = canModifyStreamerTasks ? "" : "disabled";
+
           el.innerHTML = `
-                <input type="checkbox" onchange="fetchTasks()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? "checked" : ""}/>
-                <p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">${task.title}</p>
+              <input type="checkbox" onchange="onStreamerCheckboxChange(event, '${task.id}')" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? "checked" : ""} ${checkboxDisabled}/>
+              <p class="text-base font-medium leading-normal text-text-light ${canModifyStreamerTasks ? "group-hover:text-primary" : ""} transition-colors">${task.title}</p>
             `;
           streamerTasksDiv.appendChild(el);
         });

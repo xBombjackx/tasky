@@ -397,6 +397,40 @@ app.put("/tasks/me/complete", verifyTwitchJWT, async (req, res) => {
     res.status(500).json({ message: "Error updating viewer task status." });
   }
 });
+
+// PUT /tasks/:pageId/complete - Moderator/Broadcaster can mark a specific page as completed
+app.put("/tasks/:pageId/complete", verifyTwitchJWT, async (req, res) => {
+  const { pageId } = req.params;
+  const { completed } = req.body;
+
+  // Only broadcaster or moderator may mark arbitrary pages complete
+  if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
+    return res
+      .status(403)
+      .send(
+        "Forbidden: Only moderators or the broadcaster can mark tasks complete.",
+      );
+  }
+
+  if (typeof completed !== "boolean") {
+    return res
+      .status(400)
+      .json({ message: "Request body must include boolean 'completed'." });
+  }
+
+  try {
+    await notion.pages.update({
+      page_id: pageId,
+      properties: { Completed: { checkbox: completed } },
+    });
+    res.json({
+      message: `Task ${pageId} marked as ${completed ? "completed" : "not completed"}.`,
+    });
+  } catch (error) {
+    console.error("Error updating task completion in Notion:", error);
+    res.status(500).json({ message: "Error updating task completion." });
+  }
+});
 // --- Notion Helper Functions ---
 
 const dataSourceCache = new Map();

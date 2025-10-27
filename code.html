@@ -160,17 +160,11 @@
       let isPolling = false;
       let abortController = null;
 
-      /**
-       * Starts the polling mechanism.
-       */
       function startPolling() {
         isPolling = true;
         fetchTasks();
       }
 
-      /**
-       * Stops the polling mechanism.
-       */
       function stopPolling() {
         isPolling = false;
         if (abortController) {
@@ -178,10 +172,6 @@
         }
       }
 
-      /**
-       * Handles the Twitch onAuthorized event.
-       * @param {object} auth - The authentication object from Twitch.
-       */
       twitch.onAuthorized(async (auth) => {
         console.log("Twitch authorization successful!");
         authToken = auth.token;
@@ -212,11 +202,7 @@
         }
       });
 
-      /**
-       * Marks the current viewer's approved task as completed.
-       * @param {boolean} isComplete - The new completion status.
-       * @returns {Promise<boolean>} True if the operation was successful, false otherwise.
-       */
+      // Helper: mark the current viewer's approved task as completed (or not)
       async function markMyTaskComplete(isComplete) {
         if (!authToken) return false;
         try {
@@ -236,39 +222,6 @@
           return true;
         } catch (err) {
           console.error("Error marking my task complete:", err);
-          return false;
-        }
-      }
-
-      /**
-       * Marks any task as complete, intended for moderators and broadcasters.
-       * @param {string} pageId - The ID of the page to update.
-       * @param {boolean} isComplete - The new completion status.
-       * @returns {Promise<boolean>} True if the operation was successful, false otherwise.
-       */
-      async function markPageCompleteAsMod(pageId, isComplete) {
-        if (!authToken) return false;
-        try {
-          const resp = await fetch(`${EBS_URL}/tasks/${pageId}/complete`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${authToken}`,
-            },
-            body: JSON.stringify({ completed: isComplete }),
-          });
-          if (!resp.ok) {
-            const body = await resp.json().catch(() => ({}));
-            console.warn(
-              "Failed to mark page complete as mod:",
-              resp.status,
-              body,
-            );
-            return false;
-          }
-          return true;
-        } catch (err) {
-          console.error("Error marking page complete as mod:", err);
           return false;
         }
       }
@@ -301,12 +254,10 @@
         }
       }
 
-      /**
-       * Handles the change event for viewer task checkboxes.
-       * @param {Event} event - The change event.
-       * @param {string} pageId - The ID of the page.
-       * @param {string} submitterOpaque - The opaque ID of the submitter.
-       */
+      // Called when a viewer checkbox is toggled. If the current viewer owns the task
+      // then call the /tasks/me/complete endpoint. If the user is a moderator/broadcaster
+      // (decodedRole), call the moderator endpoint for the specific pageId. Otherwise
+      // revert the checkbox and show a brief message.
       async function onViewerCheckboxChange(event, pageId, submitterOpaque) {
         const checked = event.target.checked;
         // Allow the owner to mark their own approved task complete
@@ -339,35 +290,6 @@
         event.target.checked = !checked;
       }
 
-      /**
-       * Handles the change event for streamer task checkboxes.
-       * @param {Event} event - The change event.
-       * @param {string} pageId - The ID of the page.
-       */
-      async function onStreamerCheckboxChange(event, pageId) {
-        const checked = event.target.checked;
-
-        // Allow moderators/broadcaster to mark any streamer task complete
-        if (decodedRole === "broadcaster" || decodedRole === "moderator") {
-          const ok = await markPageCompleteAsMod(pageId, checked);
-          if (!ok) {
-            // revert UI change on failure
-            event.target.checked = !checked;
-          } else {
-            // refresh to pick up any changes immediately
-            await fetchTasks();
-          }
-          return;
-        }
-
-        // Otherwise, disallow marking streamer tasks
-        alert("Only the broadcaster or moderators can complete streamer tasks.");
-        event.target.checked = !checked;
-      }
-
-      /**
-       * Fetches the tasks from the backend and renders them.
-       */
       async function fetchTasks() {
         if (!authToken || !isPolling) {
           return;
@@ -412,16 +334,9 @@
         }
       }
 
-      /**
-       * Updates the task counter and progress bar.
-       * @param {object[]} streamerTasks - The list of streamer tasks.
-       * @param {object[]} viewerTasks - The list of viewer tasks.
-       */
       function updateTaskCounter(streamerTasks, viewerTasks) {
         const allTasks = [...streamerTasks, ...viewerTasks];
-        const completedTasks = allTasks.filter(
-          (task) => task.completed || task.status === "Completed"
-        ).length;
+        const completedTasks = allTasks.filter((task) => task.completed).length;
         const totalTasks = allTasks.length;
 
         const counterEl = document.getElementById("task-counter");
@@ -436,39 +351,24 @@
         }
       }
 
-      /**
-       * Renders the streamer tasks.
-       * @param {object[]} tasks - The list of streamer tasks.
-       */
       function renderStreamerTasks(tasks) {
         streamerTasksDiv.innerHTML = ""; // Clear existing tasks
         if (tasks.length === 0) {
-          streamerTasksDiv.innerHTML =
-            "<p class='text-text-muted'>No streamer tasks yet.</p>";
+          streamerTasksDiv.innerHTML = "<p>No streamer tasks yet.</p>";
           return;
         }
-
-        const canModifyStreamerTasks =
-          decodedRole === "broadcaster" || decodedRole === "moderator";
-
         tasks.forEach((task) => {
           const el = document.createElement("label");
-          el.className = `flex items-center gap-4 py-1.5 px-2 group bg-black/20 rounded-lg ${canModifyStreamerTasks ? "cursor-pointer" : "cursor-not-allowed"}`;
-
-          const checkboxDisabled = canModifyStreamerTasks ? "" : "disabled";
-
+          el.className =
+            "flex items-center gap-4 py-1.5 px-2 cursor-pointer group bg-black/20 rounded-lg";
           el.innerHTML = `
-              <input type="checkbox" onchange="onStreamerCheckboxChange(event, '${task.id}')" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? "checked" : ""} ${checkboxDisabled}/>
-              <p class="text-base font-medium leading-normal text-text-light ${canModifyStreamerTasks ? "group-hover:text-primary" : ""} transition-colors">${task.title}</p>
+                <input type="checkbox" onchange="fetchTasks()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? "checked" : ""}/>
+                <p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">${task.title}</p>
             `;
           streamerTasksDiv.appendChild(el);
         });
       }
 
-      /**
-       * Renders the viewer tasks.
-       * @param {object[]} tasks - The list of viewer tasks.
-       */
       function renderViewerTasks(tasks) {
         viewerTasksDiv.innerHTML = ""; // Clear existing tasks
         if (tasks.length === 0) {

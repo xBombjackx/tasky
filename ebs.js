@@ -123,11 +123,8 @@ app.post("/setup", verifyTwitchJWT, async (req, res) => {
       viewerDbId = await createDatabase(notion, VIEWER_SCHEMA, parentPageId);
     }
 
-    // Save database IDs to config
-    // This is a placeholder for the actual Twitch Configuration Service call
-    console.log(
-      `Saving to Twitch Config Service: streamerDbId=${streamerDbId}, viewerDbId=${viewerDbId}`,
-    );
+    // The client-side Javascript is responsible for saving the database IDs to the
+    // Twitch Configuration Service after this endpoint returns successfully.
 
     res.json({
       message: "Setup completed successfully",
@@ -150,20 +147,31 @@ app.use("/setup", verifyTwitchJWT, setupRoutes);
 
 // --- API Endpoints for the Extension ---
 
-// GET /config - Fetches the extension's configuration
-app.get("/config", verifyTwitchJWT, async (req, res) => {
-  const { channel_id: channelId, user_id: userId } = req.twitch;
-  const url = `https://api.twitch.tv/extensions/${process.env.TWITCH_CLIENT_ID}/configurations/segments/broadcaster`;
+// --- Twitch Configuration Service Helpers ---
 
-  const token = jwt.sign(
-    {
-      exp: Math.floor(Date.now() / 1000) + 60,
-      user_id: userId,
-      role: "external",
-      channel_id: channelId,
-    },
-    Buffer.from(process.env.TWITCH_EXTENSION_SECRET, "base64"),
-  );
+// Generates a short-lived JWT for server-to-server calls to the Twitch API
+function generateTwitchApiJwt(channelId, userId) {
+  const payload = {
+    exp: Math.floor(Date.now() / 1000) + 60, // Expires in 1 minute
+    user_id: userId,
+    role: "external",
+    channel_id: channelId,
+  };
+  const secret = Buffer.from(TWITCH_EXTENSION_SECRET, "base64");
+  return jwt.sign(payload, secret);
+}
+
+// Fetches the broadcaster-specific configuration segment from the Twitch API
+async function getBroadcasterConfig(channelId, userId) {
+  if (!process.env.TWITCH_CLIENT_ID) {
+    console.warn(
+      "[EBS] TWITCH_CLIENT_ID is not set. Cannot fetch broadcaster config.",
+    );
+    return null;
+  }
+
+  const url = `https://api.twitch.tv/extensions/${process.env.TWITCH_CLIENT_ID}/configurations/segments/broadcaster?channel_id=${channelId}`;
+  const token = generateTwitchApiJwt(channelId, userId);
 
   try {
     const response = await fetch(url, {
@@ -171,24 +179,29 @@ app.get("/config", verifyTwitchJWT, async (req, res) => {
       headers: {
         "Client-ID": process.env.TWITCH_CLIENT_ID,
         Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
       },
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      const config = JSON.parse(data[0].content);
-      res.json(config);
-    } else {
-      res
-        .status(response.status)
-        .json({ message: "Failed to fetch configuration." });
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(
+        `[EBS] Twitch API error (${response.status}): ${errorBody}`,
+      );
+      throw new Error(
+        `Failed to fetch Twitch config: ${response.status} ${response.statusText}`,
+      );
     }
+
+    const data = await response.json();
+    if (data && data.length > 0 && data[0].content) {
+      return JSON.parse(data[0].content);
+    }
+    return null; // No configuration found
   } catch (error) {
-    console.error("Error fetching configuration:", error);
-    res.status(500).json({ message: "Internal server error." });
+    console.error("[EBS] Exception fetching broadcaster config:", error);
+    return null; // Ensure we always return null on error
   }
-});
+}
 
 // GET /tasks - Fetches all active tasks
 // This endpoint is "public" in the sense that any viewer can see the tasks.
@@ -197,56 +210,49 @@ app.get("/tasks", verifyTwitchJWT, async (req, res) => {
   console.log(
     `[EBS] Received GET /tasks request from user: ${req.twitch.user_id} for channel: ${channelId}`,
   );
+
+  let streamerDbId;
+  let viewerDbId;
+
   try {
-    const configResponse = await fetch(`http://localhost:${PORT}/config`, {
-      headers: {
-        Authorization: req.headers.authorization,
-      },
-    });
-
-    let streamerDbId = STREAMER_DATABASE_ID;
-    let viewerDbId = VIEWER_DATABASE_ID;
-
-    if (configResponse.ok) {
-      try {
-        const config = await configResponse.json();
-        // prefer IDs from the Twitch config, but fall back to env vars
-        streamerDbId = config.streamerDbId || streamerDbId;
-        viewerDbId = config.viewerDbId || viewerDbId;
-      } catch (parseErr) {
-        console.warn(
-          "/config returned invalid JSON; falling back to env DB IDs.",
-          parseErr.message || parseErr,
-        );
-      }
-    } else {
-      console.warn(
-        `Failed to fetch configuration from Twitch (status ${configResponse.status}). Falling back to environment DB IDs.`,
-      );
-    }
-
-    console.log(
-      `[EBS] Using streamerDbId=${streamerDbId}, viewerDbId=${viewerDbId} to fetch tasks`,
+    const broadcasterConfig = await getBroadcasterConfig(
+      req.twitch.channel_id,
+      req.twitch.user_id,
     );
-
-    let tasks;
-    try {
-      tasks = await getTasksForOverlay(streamerDbId, viewerDbId);
-    } catch (getErr) {
-      console.error(
-        "[EBS] Error while getting tasks for overlay:",
-        getErr.stack || getErr,
-      );
-      // rethrow so outer catch will return 500
-      throw getErr;
+    if (broadcasterConfig) {
+      streamerDbId = broadcasterConfig.streamerDbId;
+      viewerDbId = broadcasterConfig.viewerDbId;
     }
+  } catch (err) {
+    console.error(
+      "[EBS] Failed to get broadcaster config from Twitch, falling back to env.",
+      err,
+    );
+  }
 
+  // Fallback to env variables if Twitch config is not available for any reason
+  streamerDbId = streamerDbId || STREAMER_DATABASE_ID;
+  viewerDbId = viewerDbId || VIEWER_DATABASE_ID;
+
+  if (!streamerDbId || !viewerDbId) {
+    console.warn(
+      `[EBS] Database IDs not found for channel ${channelId}. The broadcaster may need to run setup.`,
+    );
+    // Return empty task lists to avoid errors on the frontend
+    return res.json({ streamerTasks: [], viewerTasks: [] });
+  }
+
+  console.log(
+    `[EBS] Using streamerDbId=${streamerDbId}, viewerDbId=${viewerDbId} to fetch tasks`,
+  );
+
+  try {
+    const tasks = await getTasksForOverlay(streamerDbId, viewerDbId);
     res.json(tasks);
   } catch (error) {
     console.error(
       "[EBS] CRITICAL ERROR in /tasks route:",
-      error,
-      error.stack || "no stack",
+      error.stack || error,
     );
     res
       .status(500)
@@ -601,6 +607,20 @@ async function getTasksForOverlay(streamerDbId, viewerDbId) {
 
     return { streamerTasks, viewerTasks };
   } catch (error) {
+    // If the Notion API key is invalid, it will throw a specific error.
+    // We can catch this and provide a more helpful log message.
+    if (
+      error.code === "unauthorized" ||
+      (error.body && error.body.includes("Invalid token"))
+    ) {
+      console.error(
+        "[NOTION] CRITICAL: The Notion API key is invalid or has expired. Please check your .env file.",
+      );
+      // Re-throw to ensure the caller handles the failure, which will result in a 500 error.
+      throw new Error(
+        "Notion API authorization failed. Please contact the site administrator.",
+      );
+    }
     console.error(
       "[NOTION] Failed to get tasks for overlay:",
       error.body || error,

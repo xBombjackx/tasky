@@ -4,6 +4,11 @@
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>Twitch Extension - Task Overlay</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css"
+      rel="stylesheet"
+      type="text/css"
+    />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;display=swap"
@@ -65,18 +70,16 @@
       };
     </script>
   </head>
-  <body class="bg-background-light dark:bg-background-dark font-display">
+  <body class="font-display">
     <div
       class="relative min-h-screen p-4 sm:p-6 lg:p-8 flex items-start justify-end"
     >
       <div class="absolute top-5 left-5 z-10">
-        <select
-          id="theme-switcher"
-          class="bg-background-dark/80 text-text-light rounded-lg border-border-color/50 focus:ring-primary focus:border-primary"
-        >
-          <option value="">Default</option>
-          <option value="forest">Forest</option>
-          <option value="midnight">Midnight</option>
+        <select id="theme-switcher" class="select select-bordered">
+          <option disabled selected>Theme</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="cupcake">Cupcake</option>
         </select>
       </div>
       <div
@@ -414,7 +417,7 @@
 
       const themeSwitcher = document.getElementById("theme-switcher");
       themeSwitcher.addEventListener("change", (event) => {
-        document.documentElement.setAttribute("data-theme", event.target.value);
+        document.querySelector("html").setAttribute("data-theme", event.target.value);
       });
     </script>
   </body>

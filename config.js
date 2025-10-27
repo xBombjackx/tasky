@@ -2,31 +2,26 @@
 window.Twitch.ext.onAuthorized(function (auth) {
   // Store auth token for later use by other functions
   window.twitchAuth = auth;
-  fetchConfiguration(auth.token);
-});
 
-function fetchConfiguration(token) {
-  const url = `http://localhost:8081/config`;
-  fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  })
-    .then((response) => response.json())
-    .then((data) => {
-      if (data && data.streamerDbId) {
-        document.getElementById("streamerDbId").value = data.streamerDbId;
-      }
-      if (data && data.viewerDbId) {
-        document.getElementById("viewerDbId").value = data.viewerDbId;
-      }
-    })
-    .catch((err) => {
-      console.error("Error fetching configuration:", err);
-    });
-}
+  // The broadcaster's configuration is available in the `configuration` object.
+  const configStr =
+    window.Twitch.ext.configuration &&
+    window.Twitch.ext.configuration.broadcaster
+      ? window.Twitch.ext.configuration.broadcaster.content
+      : "{}";
+
+  try {
+    const config = JSON.parse(configStr);
+    if (config.streamerDbId) {
+      document.getElementById("streamerDbId").value = config.streamerDbId;
+    }
+    if (config.viewerDbId) {
+      document.getElementById("viewerDbId").value = config.viewerDbId;
+    }
+  } catch (e) {
+    console.error("Error parsing configuration:", e);
+  }
+});
 
 function saveConfiguration() {
   const streamerDbId = document.getElementById("streamerDbId").value;

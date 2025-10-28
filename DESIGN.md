@@ -2,7 +2,7 @@
 
 ## 1. System Overview
 
-Hello. This document outlines the design of the Twitch Notion Task Overlay
+This document outlines the design of the Twitch Notion Task Overlay
 extension. The system is composed of three main components:
 
 1.  **Frontend**: An HTML/JavaScript page (`code.html`) that is displayed on the

@@ -35,7 +35,27 @@ async function updateDatabaseSchema(notion, databaseId, schema) {
         database_id: databaseId,
         properties: updates,
       });
-      console.log("Database schema updated successfully");
+      console.log("Database properties created successfully");
+
+      // Now, update status properties with their options since they must be created empty first
+      const statusUpdates = {};
+      for (const propName of Object.keys(updates)) {
+        if (schema.properties[propName].status) {
+          statusUpdates[propName] = schema.properties[propName];
+        }
+      }
+
+      if (Object.keys(statusUpdates).length > 0) {
+        console.log(
+          `Updating status options for properties:`,
+          Object.keys(statusUpdates),
+        );
+        await notion.databases.update({
+          database_id: databaseId,
+          properties: statusUpdates,
+        });
+        console.log("Status properties updated with options successfully");
+      }
     } else {
       console.log("Database schema is up to date");
     }

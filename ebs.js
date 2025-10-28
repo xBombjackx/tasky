@@ -571,12 +571,7 @@ async function getTasksForOverlay(streamerDbId, viewerDbId) {
       id: page.id,
       type: "streamer",
       title: page.properties.Task?.title[0]?.plain_text || "Untitled Task",
-      // Some installations use `State` in the streamer DB while others use `Status`.
-      // Prefer `State` (as configured in `STREAMER_SCHEMA`) but fall back to `Status`.
-      status:
-        page.properties.State?.status?.name ||
-        page.properties.Status?.status?.name ||
-        "Not started",
+      status: page.properties.Status?.status?.name || "Not started",
     }));
 
     const viewerTasks = viewerResponse.results

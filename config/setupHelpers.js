@@ -25,11 +25,25 @@ async function validateSchema(notion, databaseId, expectedSchema) {
 }
 
 async function createDatabase(notion, schema, parentPageId) {
+  // Deep copy the properties to avoid modifying the original schema object
+  const propertiesForCreate = JSON.parse(JSON.stringify(schema.properties));
+
+  // The Notion API has a two-step process for creating status properties.
+  // First, create the database WITHOUT the status property.
+  // Then, an update call is needed to add the status property with its options.
+  // This logic removes status properties from the initial create call.
+  for (const propName in propertiesForCreate) {
+    if (propertiesForCreate[propName].hasOwnProperty("status")) {
+      delete propertiesForCreate[propName];
+    }
+  }
+
   try {
     const response = await notion.databases.create({
       parent: { page_id: parentPageId },
+      is_inline: true,
       title: [{ type: "text", text: { content: schema.name } }],
-      properties: schema.properties,
+      properties: propertiesForCreate, // Use the modified properties
     });
     return response.id;
   } catch (error) {
@@ -40,40 +54,31 @@ async function createDatabase(notion, schema, parentPageId) {
 
 async function findDatabaseByTitle(notion, title) {
   try {
-    // First, try an exact title search
-    let response = await notion.search({
+    const response = await notion.search({
       query: title,
       filter: {
         property: "object",
         value: "database",
       },
+      page_size: 10,
     });
 
-    // Check for exact match first
-    let match = response.results.find(
+    const match = response.results.find(
       (db) => db.title[0]?.plain_text === title,
     );
+
     if (match) {
-      console.log(`Found existing database: ${title}`);
+      console.log(`Found existing database by title '${title}': ${match.id}`);
       return match.id;
     }
 
-    // If no exact match, try a broader search
-    response = await notion.search({
-      query: title,
-      filter: {
-        property: "object",
-        value: "database",
-      },
-      page_size: 100,
-    });
-    return (
-      response.results.find((db) => db.title[0]?.plain_text === title)?.id ||
-      null
-    );
-  } catch (error) {
-    console.error("Error searching for database:", error);
     return null;
+  } catch (error) {
+    console.error(`Error searching for database by title '${title}':`, error);
+    // Re-throw the error so the calling function knows the search failed,
+    // rather than assuming the database doesn't exist. This is critical
+    // for stopping the setup process if the Notion API key is invalid.
+    throw error;
   }
 }
 

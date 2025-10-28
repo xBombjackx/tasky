@@ -630,36 +630,77 @@ async function getTasksForOverlay(streamerDbId, viewerDbId) {
 }
 
 // --- Server Start ---
+
+// Poll the Notion API until the schema updates have been applied.
+// This is more reliable than a fixed delay.
+async function waitForSchemaUpdate(
+  notion,
+  databaseId,
+  expectedProps,
+  timeout = 60000,
+  interval = 5000,
+) {
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeout) {
+    try {
+      const db = await notion.databases.retrieve({ database_id: databaseId });
+      const currentProps = Object.keys(db.properties);
+      const hasAllProps = expectedProps.every((p) => currentProps.includes(p));
+      if (hasAllProps) {
+        console.log(`Schema for DB ${databaseId} is up to date.`);
+        return true;
+      }
+    } catch (error) {
+      console.warn(
+        `Polling for schema update on ${databaseId} failed:`,
+        error.message,
+      );
+    }
+    await new Promise((res) => setTimeout(res, interval));
+  }
+  console.error(
+    `Timed out waiting for schema update on DB ${databaseId} after ${
+      timeout / 1000
+    }s.`,
+  );
+  return false;
+}
+
 async function initializeServer() {
   if (STREAMER_DATABASE_ID && VIEWER_DATABASE_ID) {
     console.log("Updating database schemas...");
-    const streamerSchemaOk = await updateDatabaseSchema(
+    await updateDatabaseSchema(notion, STREAMER_DATABASE_ID, STREAMER_SCHEMA);
+    await updateDatabaseSchema(notion, VIEWER_DATABASE_ID, VIEWER_SCHEMA);
+
+    console.log("Waiting for schema changes to apply...");
+    const streamerSchemaReady = await waitForSchemaUpdate(
       notion,
       STREAMER_DATABASE_ID,
-      STREAMER_SCHEMA,
+      Object.keys(STREAMER_SCHEMA.properties),
     );
-    const viewerSchemaOk = await updateDatabaseSchema(
+
+    const viewerSchemaReady = await waitForSchemaUpdate(
       notion,
       VIEWER_DATABASE_ID,
-      VIEWER_SCHEMA,
+      Object.keys(VIEWER_SCHEMA.properties),
     );
 
     console.log("Migrating existing data...");
-    if (streamerSchemaOk) {
+    if (streamerSchemaReady) {
       await migrateDatabase(notion, STREAMER_DATABASE_ID, STREAMER_SCHEMA);
     } else {
       console.warn(
-        "Skipping streamer DB page migration because schema update failed or database is missing properties.",
+        "Skipping streamer DB page migration because schema update failed or timed out.",
       );
     }
 
-    if (viewerSchemaOk) {
+    if (viewerSchemaReady) {
       await migrateDatabase(notion, VIEWER_DATABASE_ID, VIEWER_SCHEMA);
       // Ensure Approval Status is populated from existing Status values so older pages remain functional
       await fillApprovalStatusFromStatus(notion, VIEWER_DATABASE_ID);
     } else {
       console.warn(
-        "Skipping viewer DB page migration because schema update failed or database is missing properties.",
+        "Skipping viewer DB page migration because schema update failed or timed out.",
       );
     }
   }

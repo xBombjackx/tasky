@@ -1,5 +1,16 @@
 const { Client } = require("@notionhq/client");
 
+/**
+ * Ensure a Notion database's properties match the provided schema.
+ *
+ * If a property is missing or has a different type, the function adds or replaces it.
+ * For `status` properties, it first creates them with an empty `status` object (to satisfy API constraints)
+ * and then applies their status options in a second update.
+ *
+ * @param {string} databaseId - The Notion database ID to update.
+ * @param {Object} schema - Schema object containing a `properties` map of Notion property definitions to apply.
+ * @returns {boolean} `true` if the schema update completed successfully, `false` on error.
+ */
 async function updateDatabaseSchema(notion, databaseId, schema) {
   try {
     // Get current database structure

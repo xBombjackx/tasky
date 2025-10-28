@@ -159,9 +159,12 @@
       let decodedRole = null;
       let isPolling = false;
       let abortController = null;
+      let timeoutId = null;
 
       function startPolling() {
+        if (isPolling) return;
         isPolling = true;
+        abortController = new AbortController();
         fetchTasks();
       }
 
@@ -169,39 +172,11 @@
         isPolling = false;
         if (abortController) {
           abortController.abort();
+          abortController = null;
         }
-      }
-
-      /**
-       * Marks any task as complete, intended for moderators and broadcasters.
-       * @param {string} pageId - The ID of the page to update.
-       * @param {boolean} isComplete - The new completion status.
-       * @returns {Promise<boolean>} True if the operation was successful, false otherwise.
-       */
-      async function markPageCompleteAsMod(pageId, isComplete) {
-        if (!authToken) return false;
-        try {
-          const resp = await fetch(`${EBS_URL}/tasks/${pageId}/complete`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${authToken}`,
-            },
-            body: JSON.stringify({ completed: isComplete }),
-          });
-          if (!resp.ok) {
-            const body = await resp.json().catch(() => ({}));
-            console.warn(
-              "Failed to mark page complete as mod:",
-              resp.status,
-              body,
-            );
-            return false;
-          }
-          return true;
-        } catch (err) {
-          console.error("Error marking page complete as mod:", err);
-          return false;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
         }
       }
 
@@ -259,6 +234,34 @@
         }
       }
 
+      // Helper: moderator/broadcaster can mark any page complete by pageId
+      async function markPageCompleteAsMod(pageId, isComplete) {
+        if (!authToken) return false;
+        try {
+          const resp = await fetch(`${EBS_URL}/tasks/${pageId}/complete`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ completed: isComplete }),
+          });
+          if (!resp.ok) {
+            const body = await resp.json().catch(() => ({}));
+            console.warn(
+              "Failed to mark page complete as mod:",
+              resp.status,
+              body,
+            );
+            return false;
+          }
+          return true;
+        } catch (err) {
+          console.error("Error marking page complete as mod:", err);
+          return false;
+        }
+      }
+
       // Called when a viewer checkbox is toggled. If the current viewer owns the task
       // then call the /tasks/me/complete endpoint. If the user is a moderator/broadcaster
       // (decodedRole), call the moderator endpoint for the specific pageId. Otherwise
@@ -292,27 +295,6 @@
 
         // Otherwise, disallow marking other users' tasks
         alert("You can only mark your own tasks as complete.");
-        event.target.checked = !checked;
-      }
-
-      async function onStreamerCheckboxChange(event, pageId) {
-        const checked = event.target.checked;
-
-        // Allow moderators/broadcaster to mark any streamer task complete
-        if (decodedRole === "broadcaster" || decodedRole === "moderator") {
-          const ok = await markPageCompleteAsMod(pageId, checked);
-          if (!ok) {
-            // revert UI change on failure
-            event.target.checked = !checked;
-          } else {
-            // refresh to pick up any changes immediately
-            await fetchTasks();
-          }
-          return;
-        }
-
-        // Otherwise, disallow marking streamer tasks
-        alert("Only the broadcaster or moderators can complete streamer tasks.");
         event.target.checked = !checked;
       }
 
@@ -355,7 +337,7 @@
           }
         } finally {
           if (isPolling) {
-            setTimeout(fetchTasks, 10000);
+            timeoutId = setTimeout(fetchTasks, 10000);
           }
         }
       }
@@ -380,45 +362,25 @@
       function renderStreamerTasks(tasks) {
         streamerTasksDiv.innerHTML = ""; // Clear existing tasks
         if (tasks.length === 0) {
-          const p = document.createElement("p");
-          p.textContent = "No streamer tasks yet.";
-          streamerTasksDiv.appendChild(p);
+          streamerTasksDiv.innerHTML = "<p>No streamer tasks yet.</p>";
           return;
         }
-
-        const canModifyStreamerTasks =
-          decodedRole === "broadcaster" || decodedRole === "moderator";
-
         tasks.forEach((task) => {
-          const label = document.createElement("label");
-          label.className = `flex items-center gap-4 py-1.5 px-2 group bg-black/20 rounded-lg ${canModifyStreamerTasks ? "cursor-pointer" : "cursor-not-allowed"}`;
-
-          const checkbox = document.createElement("input");
-          checkbox.type = "checkbox";
-          checkbox.className =
-            "h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200";
-          checkbox.checked = task.completed;
-          checkbox.disabled = !canModifyStreamerTasks;
-          checkbox.addEventListener("change", (event) =>
-            onStreamerCheckboxChange(event, task.id)
-          );
-
-          const p = document.createElement("p");
-          p.className = `text-base font-medium leading-normal text-text-light ${canModifyStreamerTasks ? "group-hover:text-primary" : ""} transition-colors`;
-          p.textContent = task.title;
-
-          label.appendChild(checkbox);
-          label.appendChild(p);
-          streamerTasksDiv.appendChild(label);
+          const el = document.createElement("label");
+          el.className =
+            "flex items-center gap-4 py-1.5 px-2 cursor-pointer group bg-black/20 rounded-lg";
+          el.innerHTML = `
+                <input type="checkbox" onchange="fetchTasks()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? "checked" : ""}/>
+                <p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">${task.title}</p>
+            `;
+          streamerTasksDiv.appendChild(el);
         });
       }
 
       function renderViewerTasks(tasks) {
         viewerTasksDiv.innerHTML = ""; // Clear existing tasks
         if (tasks.length === 0) {
-          const p = document.createElement("p");
-          p.textContent = "No viewer tasks yet.";
-          viewerTasksDiv.appendChild(p);
+          viewerTasksDiv.innerHTML = "<p>No viewer tasks yet.</p>";
           return;
         }
         // Sort tasks by role priority: VIP > Moderator > Subscriber > Viewer
@@ -437,81 +399,54 @@
         });
 
         tasks.forEach((task) => {
-          const label = document.createElement("label");
-          label.htmlFor = `viewer-task-${task.id}`;
+          const el = document.createElement("label");
+          el.htmlFor = `viewer-task-${task.id}`;
 
+          let iconHtml = "";
           let titleClass = "text-text-light";
           let containerClass = "bg-black/20";
-          let iconName = null;
-          let iconClass = "";
 
           switch (task.role) {
             case "VIP":
               containerClass = "bg-vip-bg vip-task";
               titleClass = "text-vip-glow font-bold";
-              iconName = "workspace_premium";
-              iconClass = "text-3xl text-vip-glow";
+              iconHtml =
+                '<span class="material-symbols-outlined text-3xl text-vip-glow">workspace_premium</span>';
               break;
             case "Moderator":
+              // Assuming a moderator style might exist or be added
               titleClass = "text-primary font-bold";
-              iconName = "shield";
-              iconClass = "text-2xl text-primary";
+              iconHtml =
+                '<span class="material-symbols-outlined text-2xl text-primary">shield</span>';
               break;
             case "SubscriberT1":
             case "SubscriberT2":
             case "SubscriberT3":
               containerClass = "bg-black/20";
               titleClass = "text-subscriber";
-              iconName = "star";
-              iconClass = "text-2xl text-subscriber";
+              iconHtml =
+                '<span class="material-symbols-outlined text-2xl text-subscriber">star</span>';
               break;
           }
 
+          // Apply a disabled style for rejected or completed tasks
           if (task.status === "Rejected" || task.completed) {
-            label.classList.add("opacity-50", "line-through");
+            el.classList.add("opacity-50", "line-through");
           }
 
-          label.className = `relative flex items-center gap-4 py-1.5 px-2 group rounded-lg cursor-pointer ${containerClass}`;
+          el.className = `relative flex items-center gap-4 py-1.5 px-2 group rounded-lg cursor-pointer ${containerClass}`;
+          el.innerHTML = `
+                <div class="flex-shrink-0">
+                  <input type="checkbox" onchange="onViewerCheckboxChange(event, '${task.id}', '${task.submitter}')" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? "checked" : ""}/>
+                </div>
+                <div class="flex flex-col justify-center flex-1">
+                    <span class="text-base font-medium leading-normal ${titleClass} group-hover:text-primary transition-colors">${task.title}</span>
+                    <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
+                </div>
+                ${iconHtml}
+              `;
 
-          const checkboxContainer = document.createElement("div");
-          checkboxContainer.className = "flex-shrink-0";
-
-          const checkbox = document.createElement("input");
-          checkbox.type = "checkbox";
-          checkbox.className =
-            "h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer";
-          checkbox.id = `viewer-task-${task.id}`;
-          checkbox.checked = task.completed;
-          checkbox.addEventListener("change", (event) =>
-            onViewerCheckboxChange(event, task.id, task.submitter)
-          );
-          checkboxContainer.appendChild(checkbox);
-
-          const taskInfoContainer = document.createElement("div");
-          taskInfoContainer.className = "flex flex-col justify-center flex-1";
-
-          const titleEl = document.createElement("span");
-          titleEl.className = `text-base font-medium leading-normal ${titleClass} group-hover:text-primary transition-colors`;
-          titleEl.textContent = task.title;
-
-          const submitterEl = document.createElement("p");
-          submitterEl.className = "text-sm font-normal leading-normal text-text-muted";
-          submitterEl.textContent = `by @${task.submitter}`;
-
-          taskInfoContainer.appendChild(titleEl);
-          taskInfoContainer.appendChild(submitterEl);
-
-          label.appendChild(checkboxContainer);
-          label.appendChild(taskInfoContainer);
-
-          if (iconName) {
-            const iconEl = document.createElement("span");
-            iconEl.className = `material-symbols-outlined ${iconClass}`;
-            iconEl.textContent = iconName;
-            label.appendChild(iconEl);
-          }
-
-          viewerTasksDiv.appendChild(label);
+          viewerTasksDiv.appendChild(el);
         });
       }
 

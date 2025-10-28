@@ -57,12 +57,7 @@ app.use((req, res, next) => {
 configStore.init().catch(console.error);
 
 // --- Twitch JWT Verification Middleware ---
-/**
- * Verifies the Twitch JWT from the request headers.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
- * @param {express.NextFunction} next - The next middleware function.
- */
+// Every request from the extension will have a JWT. We must verify it.
 function verifyTwitchJWT(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1]; // Get token from "Bearer <token>"
   if (!token) {
@@ -154,12 +149,7 @@ app.use("/setup", verifyTwitchJWT, setupRoutes);
 
 // --- Twitch Configuration Service Helpers ---
 
-/**
- * Generates a short-lived JWT for server-to-server calls to the Twitch API.
- * @param {string} channelId - The channel ID.
- * @param {string} userId - The user ID.
- * @returns {string} The generated JWT.
- */
+// Generates a short-lived JWT for server-to-server calls to the Twitch API
 function generateTwitchApiJwt(channelId, userId) {
   const payload = {
     exp: Math.floor(Date.now() / 1000) + 60, // Expires in 1 minute
@@ -171,12 +161,7 @@ function generateTwitchApiJwt(channelId, userId) {
   return jwt.sign(payload, secret);
 }
 
-/**
- * Fetches the broadcaster-specific configuration segment from the Twitch API.
- * @param {string} channelId - The channel ID.
- * @param {string} userId - The user ID.
- * @returns {Promise<object|null>} The broadcaster configuration, or null if not found.
- */
+// Fetches the broadcaster-specific configuration segment from the Twitch API
 async function getBroadcasterConfig(channelId, userId) {
   if (!process.env.TWITCH_CLIENT_ID) {
     console.warn(
@@ -412,49 +397,10 @@ app.put("/tasks/me/complete", verifyTwitchJWT, async (req, res) => {
     res.status(500).json({ message: "Error updating viewer task status." });
   }
 });
-
-// PUT /tasks/:pageId/complete - Moderator/Broadcaster can mark a specific page as completed
-app.put("/tasks/:pageId/complete", verifyTwitchJWT, async (req, res) => {
-  const { pageId } = req.params;
-  const { completed } = req.body;
-
-  // Only broadcaster or moderator may mark arbitrary pages complete
-  if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
-    return res
-      .status(403)
-      .send(
-        "Forbidden: Only moderators or the broadcaster can mark tasks complete.",
-      );
-  }
-
-  if (typeof completed !== "boolean") {
-    return res
-      .status(400)
-      .json({ message: "Request body must include boolean 'completed'." });
-  }
-
-  try {
-    await notion.pages.update({
-      page_id: pageId,
-      properties: { Completed: { checkbox: completed } },
-    });
-    res.json({
-      message: `Task ${pageId} marked as ${completed ? "completed" : "not completed"}.`,
-    });
-  } catch (error) {
-    console.error("Error updating task completion in Notion:", error);
-    res.status(500).json({ message: "Error updating task completion." });
-  }
-});
 // --- Notion Helper Functions ---
 
 const dataSourceCache = new Map();
 
-/**
- * Checks if a given text contains prohibited content.
- * @param {string} text - The text to check.
- * @returns {boolean} True if the text contains prohibited content, false otherwise.
- */
 // Simple prohibited content checker. Keep this list conservative and update as needed.
 const PROHIBITED_PATTERNS = [
   /kill\s+yourself/i,
@@ -472,11 +418,6 @@ function containsProhibited(text) {
   return false;
 }
 
-/**
- * Retrieves the data source ID for a given database ID.
- * @param {string} databaseId - The ID of the database.
- * @returns {Promise<string|null>} The data source ID, or null if not found.
- */
 async function getDataSourceId(databaseId) {
   if (dataSourceCache.has(databaseId)) {
     return dataSourceCache.get(databaseId);
@@ -500,12 +441,6 @@ async function getDataSourceId(databaseId) {
   }
 }
 
-/**
- * Finds a user's task in the viewer database.
- * @param {string} opaque_user_id - The opaque user ID.
- * @param {string} approvalStatus - The approval status of the task.
- * @returns {Promise<object|null>} The task object, or null if not found.
- */
 async function findUserTask(opaque_user_id, approvalStatus) {
   const dataSourceId = await getDataSourceId(VIEWER_DATABASE_ID);
   if (!dataSourceId) return null;
@@ -546,12 +481,6 @@ async function findUserTask(opaque_user_id, approvalStatus) {
   }
 }
 
-/**
- * Adds a new task to the viewer database.
- * @param {string} opaque_user_id - The opaque user ID of the submitter.
- * @param {string} taskDescription - The description of the task.
- * @returns {Promise<void>}
- */
 async function addViewerTask(opaque_user_id, taskDescription) {
   try {
     if (!VIEWER_DATABASE_ID) {
@@ -577,11 +506,6 @@ async function addViewerTask(opaque_user_id, taskDescription) {
   }
 }
 
-/**
- * Approves a viewer's task.
- * @param {string} opaque_user_id - The opaque user ID of the viewer.
- * @returns {Promise<string>} A message indicating the result of the operation.
- */
 async function approveViewerTask(opaque_user_id) {
   const task = await findUserTask(opaque_user_id, "Pending");
   if (task) {
@@ -595,11 +519,6 @@ async function approveViewerTask(opaque_user_id) {
   return `No pending task found for @${opaque_user_id}.`;
 }
 
-/**
- * Rejects a viewer's task.
- * @param {string} opaque_user_id - The opaque user ID of the viewer.
- * @returns {Promise<string>} A message indicating the result of the operation.
- */
 async function rejectViewerTask(opaque_user_id) {
   const task = await findUserTask(opaque_user_id, "Pending");
   if (task) {
@@ -610,12 +529,6 @@ async function rejectViewerTask(opaque_user_id) {
   return `No pending task found for @${opaque_user_id} to reject.`;
 }
 
-/**
- * Updates the completion status of a viewer's task.
- * @param {string} opaque_user_id - The opaque user ID of the viewer.
- * @param {boolean} isComplete - The new completion status.
- * @returns {Promise<string>} A message indicating the result of the operation.
- */
 async function updateViewerTaskStatus(opaque_user_id, isComplete) {
   const task = await findUserTask(opaque_user_id, "Approved");
   if (task) {
@@ -632,12 +545,6 @@ async function updateViewerTaskStatus(opaque_user_id, isComplete) {
   return `@${opaque_user_id}, no active task found for you to update.`;
 }
 
-/**
- * Retrieves all tasks for the overlay.
- * @param {string} streamerDbId - The ID of the streamer's database.
- * @param {string} viewerDbId - The ID of the viewer's database.
- * @returns {Promise<{streamerTasks: object[], viewerTasks: object[]}>} An object containing the streamer and viewer tasks.
- */
 async function getTasksForOverlay(streamerDbId, viewerDbId) {
   try {
     if (!streamerDbId || !viewerDbId) {
@@ -723,9 +630,6 @@ async function getTasksForOverlay(streamerDbId, viewerDbId) {
 }
 
 // --- Server Start ---
-/**
- * Initializes and starts the Express server.
- */
 async function initializeServer() {
   if (STREAMER_DATABASE_ID && VIEWER_DATABASE_ID) {
     console.log("Updating database schemas...");

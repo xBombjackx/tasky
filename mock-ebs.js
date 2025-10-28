@@ -13,8 +13,8 @@ app.use(express.json()); // Middleware to parse JSON bodies
 
 const mockTasks = {
   streamerTasks: [
-    { id: "st1", title: "Finish the main story quest", completed: false },
-    { id: "st2", title: "Defeat the secret boss", completed: true },
+    { id: "st1", title: "Finish the main story quest" },
+    { id: "st2", title: "Defeat the secret boss" },
   ],
   viewerTasks: [
     {

@@ -43,7 +43,7 @@ This database holds tasks for the streamer.
 | Property Name | Type       | Description                                                                    |
 | ------------- | ---------- | ------------------------------------------------------------------------------ |
 | `Task`        | `Title`    | The name or description of the task. This is the main property.                |
-| `State`       | `Status`   | The current status of the task. Options: `Not started`, `In progress`, `Done`. |
+| `Status`      | `Status`   | The current status of the task. Options: `Not started`, `In progress`, `Done`. |
 | `Cost`        | `Number`   | (Optional) The cost of the task, e.g., in channel points.                      |
 | `Completed`   | `Checkbox` | A checkbox to indicate if the task is completed.                               |
 
@@ -63,8 +63,6 @@ This database holds tasks submitted by viewers.
 **Note:** Ensure the property names in your Notion databases match exactly what
 is listed above, as the integration will use these names to read and write data.
 The `Role` property's `Select` options must be capitalized exactly as shown.
-**Important**: The `State` property on the Streamer database is intentionally
-named `State` to match the current backend code.
 
 ## Running the Servers
 

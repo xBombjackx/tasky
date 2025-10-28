@@ -4,7 +4,7 @@ const STREAMER_SCHEMA = {
     Task: {
       title: {},
     },
-    State: {
+    Status: {
       status: {
         options: [
           { name: "Not started", color: "default" },

@@ -325,7 +325,18 @@ app.post("/tasks", verifyTwitchJWT, async (req, res) => {
   );
 
   try {
-    await addViewerTask(submitterId, taskDescription.trim());
+    const broadcasterConfig = await getBroadcasterConfig(
+      req.twitch.channel_id,
+      req.twitch.user_id,
+    );
+    const viewerDbId =
+      broadcasterConfig?.viewerDbId || process.env.VIEWER_DATABASE_ID;
+
+    if (!viewerDbId) {
+      throw new Error(`No viewer database ID configured for channel ${channelId}`);
+    }
+
+    await addViewerTask(viewerDbId, submitterId, taskDescription.trim());
     res
       .status(201)
       .json({ message: "Task submitted successfully for approval!" });
@@ -439,7 +450,20 @@ app.put("/tasks/me/complete", verifyTwitchJWT, async (req, res) => {
   }
 
   try {
-    const msg = await updateViewerTaskStatus(opaque, completed);
+    const broadcasterConfig = await getBroadcasterConfig(
+      req.twitch.channel_id,
+      req.twitch.user_id,
+    );
+    const viewerDbId =
+      broadcasterConfig?.viewerDbId || process.env.VIEWER_DATABASE_ID;
+
+    if (!viewerDbId) {
+      throw new Error(
+        `No viewer database ID configured for channel ${req.twitch.channel_id}`,
+      );
+    }
+
+    const msg = await updateViewerTaskStatus(viewerDbId, opaque, completed);
     res.json({ message: msg });
   } catch (error) {
     console.error("Error updating viewer task status:", error);
@@ -503,12 +527,13 @@ async function getDataSourceId(databaseId) {
 
 /**
  * Finds a user's task in the viewer database.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
  * @param {string} opaque_user_id - The opaque user ID of the viewer.
  * @param {string} approvalStatus - The approval status of the task to find (e.g., "Pending", "Approved").
  * @returns {Promise<object|null>} The Notion page object for the task, or null if not found.
  */
-async function findUserTask(opaque_user_id, approvalStatus) {
-  const dataSourceId = await getDataSourceId(VIEWER_DATABASE_ID);
+async function findUserTask(viewerDbId, opaque_user_id, approvalStatus) {
+  const dataSourceId = await getDataSourceId(viewerDbId);
   if (!dataSourceId) return null;
   try {
     // First try to find by the new `Approval Status` property (select)
@@ -549,17 +574,18 @@ async function findUserTask(opaque_user_id, approvalStatus) {
 
 /**
  * Adds a new task to the viewer database.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
  * @param {string} opaque_user_id - The opaque user ID of the viewer who submitted the task.
  * @param {string} taskDescription - The description of the task.
  * @returns {Promise<void>}
  */
-async function addViewerTask(opaque_user_id, taskDescription) {
+async function addViewerTask(viewerDbId, opaque_user_id, taskDescription) {
   try {
-    if (!VIEWER_DATABASE_ID) {
+    if (!viewerDbId) {
       throw new Error("Viewer database ID not found in environment variables.");
     }
     await notion.pages.create({
-      parent: { database_id: VIEWER_DATABASE_ID },
+      parent: { database_id: viewerDbId },
       properties: {
         Task: { title: [{ text: { content: taskDescription } }] },
         "Suggested by": { rich_text: [{ text: { content: opaque_user_id } }] },
@@ -580,11 +606,12 @@ async function addViewerTask(opaque_user_id, taskDescription) {
 
 /**
  * Approves a viewer's pending task.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
  * @param {string} opaque_user_id - The opaque user ID of the viewer.
  * @returns {Promise<string>} A message indicating the result of the operation.
  */
-async function approveViewerTask(opaque_user_id) {
-  const task = await findUserTask(opaque_user_id, "Pending");
+async function approveViewerTask(viewerDbId, opaque_user_id) {
+  const task = await findUserTask(viewerDbId, opaque_user_id, "Pending");
   if (task) {
     await notion.pages.update({
       page_id: task.id,
@@ -598,11 +625,12 @@ async function approveViewerTask(opaque_user_id) {
 
 /**
  * Rejects a viewer's pending task.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
  * @param {string} opaque_user_id - The opaque user ID of the viewer.
  * @returns {Promise<string>} A message indicating the result of the operation.
  */
-async function rejectViewerTask(opaque_user_id) {
-  const task = await findUserTask(opaque_user_id, "Pending");
+async function rejectViewerTask(viewerDbId, opaque_user_id) {
+  const task = await findUserTask(viewerDbId, opaque_user_id, "Pending");
   if (task) {
     await notion.pages.update({ page_id: task.id, archived: true });
     console.log(`[NOTION] Rejected (archived) task for ${opaque_user_id}`);
@@ -613,12 +641,13 @@ async function rejectViewerTask(opaque_user_id) {
 
 /**
  * Updates the completion status of a viewer's approved task.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
  * @param {string} opaque_user_id - The opaque user ID of the viewer.
  * @param {boolean} isComplete - True to mark the task as complete, false to mark it as not complete.
  * @returns {Promise<string>} A message indicating the result of the operation.
  */
-async function updateViewerTaskStatus(opaque_user_id, isComplete) {
-  const task = await findUserTask(opaque_user_id, "Approved");
+async function updateViewerTaskStatus(viewerDbId, opaque_user_id, isComplete) {
+  const task = await findUserTask(viewerDbId, opaque_user_id, "Approved");
   if (task) {
     await notion.pages.update({
       page_id: task.id,

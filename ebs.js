@@ -72,6 +72,11 @@ function verifyTwitchJWT(req, res, next) {
   }
 
   try {
+    if (!TWITCH_EXTENSION_SECRET) {
+      return res
+        .status(500)
+        .send("Server misconfigured: missing extension secret");
+    }
     // The secret must be Base64 decoded, as per Twitch's documentation
     const decodedSecret = Buffer.from(TWITCH_EXTENSION_SECRET, "base64");
     const decodedToken = jwt.verify(token, decodedSecret);

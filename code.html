@@ -366,17 +366,32 @@
       function renderStreamerTasks(tasks) {
         streamerTasksDiv.innerHTML = ""; // Clear existing tasks
         if (tasks.length === 0) {
-          streamerTasksDiv.innerHTML = "<p>No streamer tasks yet.</p>";
+          const p = document.createElement("p");
+          p.textContent = "No streamer tasks yet.";
+          streamerTasksDiv.appendChild(p);
           return;
         }
         tasks.forEach((task) => {
           const el = document.createElement("label");
           el.className =
             "flex items-center gap-4 py-1.5 px-2 cursor-pointer group bg-black/20 rounded-lg";
-          el.innerHTML = `
-                <input type="checkbox" onchange="fetchTasks()" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200" ${task.completed ? "checked" : ""}/>
-                <p class="text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors">${task.title}</p>
-            `;
+
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.onchange = fetchTasks;
+          input.className =
+            "h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200";
+          if (task.completed) {
+            input.checked = true;
+          }
+
+          const p = document.createElement("p");
+          p.className =
+            "text-base font-medium leading-normal text-text-light group-hover:text-primary transition-colors";
+          p.textContent = task.title;
+
+          el.appendChild(input);
+          el.appendChild(p);
           streamerTasksDiv.appendChild(el);
         });
       }
@@ -384,7 +399,9 @@
       function renderViewerTasks(tasks) {
         viewerTasksDiv.innerHTML = ""; // Clear existing tasks
         if (tasks.length === 0) {
-          viewerTasksDiv.innerHTML = "<p>No viewer tasks yet.</p>";
+          const p = document.createElement("p");
+          p.textContent = "No viewer tasks yet.";
+          viewerTasksDiv.appendChild(p);
           return;
         }
         // Sort tasks by role priority: VIP > Moderator > Subscriber > Viewer
@@ -406,7 +423,7 @@
           const el = document.createElement("label");
           el.htmlFor = `viewer-task-${task.id}`;
 
-          let iconHtml = "";
+          let iconEl = null;
           let titleClass = "text-text-light";
           let containerClass = "bg-black/20";
 
@@ -414,22 +431,28 @@
             case "VIP":
               containerClass = "bg-vip-bg vip-task";
               titleClass = "text-vip-glow font-bold";
-              iconHtml =
-                '<span class="material-symbols-outlined text-3xl text-vip-glow">workspace_premium</span>';
+              iconEl = document.createElement("span");
+              iconEl.className =
+                "material-symbols-outlined text-3xl text-vip-glow";
+              iconEl.textContent = "workspace_premium";
               break;
             case "Moderator":
               // Assuming a moderator style might exist or be added
               titleClass = "text-primary font-bold";
-              iconHtml =
-                '<span class="material-symbols-outlined text-2xl text-primary">shield</span>';
+              iconEl = document.createElement("span");
+              iconEl.className =
+                "material-symbols-outlined text-2xl text-primary";
+              iconEl.textContent = "shield";
               break;
             case "SubscriberT1":
             case "SubscriberT2":
             case "SubscriberT3":
               containerClass = "bg-black/20";
               titleClass = "text-subscriber";
-              iconHtml =
-                '<span class="material-symbols-outlined text-2xl text-subscriber">star</span>';
+              iconEl = document.createElement("span");
+              iconEl.className =
+                "material-symbols-outlined text-2xl text-subscriber";
+              iconEl.textContent = "star";
               break;
           }
 
@@ -439,16 +462,42 @@
           }
 
           el.className = `relative flex items-center gap-4 py-1.5 px-2 group rounded-lg cursor-pointer ${containerClass}`;
-          el.innerHTML = `
-                <div class="flex-shrink-0">
-                  <input type="checkbox" onchange="onViewerCheckboxChange(event, '${task.id}', '${task.submitter}')" class="h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer" id="viewer-task-${task.id}" ${task.completed ? "checked" : ""}/>
-                </div>
-                <div class="flex flex-col justify-center flex-1">
-                    <span class="text-base font-medium leading-normal ${titleClass} group-hover:text-primary transition-colors">${task.title}</span>
-                    <p class="text-sm font-normal leading-normal text-text-muted">by @${task.submitter}</p>
-                </div>
-                ${iconHtml}
-              `;
+
+          const div1 = document.createElement("div");
+          div1.className = "flex-shrink-0";
+
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.onchange = (event) =>
+            onViewerCheckboxChange(event, task.id, task.submitter);
+          input.className =
+            "h-6 w-6 shrink-0 rounded-lg border-border-color border-2 bg-transparent text-primary checked:bg-primary checked:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background-dark transition-all duration-200 peer";
+          input.id = `viewer-task-${task.id}`;
+          if (task.completed) {
+            input.checked = true;
+          }
+          div1.appendChild(input);
+
+          const div2 = document.createElement("div");
+          div2.className = "flex flex-col justify-center flex-1";
+
+          const spanTitle = document.createElement("span");
+          spanTitle.className = `text-base font-medium leading-normal ${titleClass} group-hover:text-primary transition-colors`;
+          spanTitle.textContent = task.title;
+
+          const pSubmitter = document.createElement("p");
+          pSubmitter.className =
+            "text-sm font-normal leading-normal text-text-muted";
+          pSubmitter.textContent = `by @${task.submitter}`;
+
+          div2.appendChild(spanTitle);
+          div2.appendChild(pSubmitter);
+
+          el.appendChild(div1);
+          el.appendChild(div2);
+          if (iconEl) {
+            el.appendChild(iconEl);
+          }
 
           viewerTasksDiv.appendChild(el);
         });

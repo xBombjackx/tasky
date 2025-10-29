@@ -18,13 +18,12 @@ These tasks address items from the code review and should be completed before bu
 
 ## Code Review Findings (Self-Identified)
 
-- [ ] **[code.html]** **Security (High Priority):** Refactor `renderStreamerTasks` and `renderViewerTasks` to use `document.createElement` and `.textContent` instead of `innerHTML` to prevent XSS vulnerabilities from malicious data in the Notion database.
-- [ ] **[config/setupHelpers.js]** **Bug (Critical):** The `createDatabase` function incorrectly deletes `status` properties from the schema but never adds them back. This results in newly created databases missing their `Status` columns. The logic needs to be corrected to perform the required two-step process for creating status properties.
-- [ ] **[config/databaseSchemas.js]** **Data Modeling:** The `VIEWER_SCHEMA`'s `Status` property contains redundant "Approved" and "Rejected" options that conflict with the `"Approval Status"` property. Simplify the `Status` property to only include states relevant to an approved task's lifecycle (e.g., "Not started", "In progress", "Done").
+- [x] **[code.html]** **Security (High Priority):** Refactor `renderStreamerTasks` and `renderViewerTasks` to use `document.createElement` and `.textContent` instead of `innerHTML` to prevent XSS vulnerabilities from malicious data in the Notion database.
+- [x] **[config/databaseSchemas.js]** **Data Modeling:** The `VIEWER_SCHEMA`'s `Status` property contains redundant "Approved" and "Rejected" options that conflict with the `"Approval Status"` property. Simplify the `Status` property to only include states relevant to an approved task's lifecycle (e.g., "Not started", "In progress", "Done").
 - [ ] **[ebs.js]** **Refactor:** The logic for fetching the broadcaster's configuration is duplicated across multiple endpoints (`/tasks`, `/tasks/me/complete`, etc.). This could be extracted into a middleware function to run after `verifyTwitchJWT` to reduce code duplication and streamline the request lifecycle.
+- [x] **[ebs.js]** **Data Integrity:** The `findUserTask` function includes a fallback to query by the `Status` property. To ensure data consistency and prevent bugs, this fallback should be removed. The system should rely exclusively on `"Approval Status"` for moderation states.
 - [ ] **[ebs.js]** **Security:** The `containsProhibited` function provides a very basic level of content moderation. This should be expanded with a more robust list of patterns or integrated with a third-party moderation service to better protect streamers and viewers.
 - [ ] **[code.html]** **Performance:** The `onViewerCheckboxChange` function re-fetches all tasks after a single task's status changes. This is inefficient. Refactor to update the UI directly or only re-render the affected task.
-- [ ] **[ebs.js]** **Data Integrity:** The `findUserTask` function includes a fallback to query by the `Status` property. To ensure data consistency and prevent bugs, this fallback should be removed. The system should rely exclusively on `"Approval Status"` for moderation states.
 
 ## New Code Review Findings
 

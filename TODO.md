@@ -26,6 +26,14 @@ These tasks address items from the code review and should be completed before bu
 - [ ] **[code.html]** **Performance:** The `onViewerCheckboxChange` function re-fetches all tasks after a single task's status changes. This is inefficient. Refactor to update the UI directly or only re-render the affected task.
 - [ ] **[ebs.js]** **Data Integrity:** The `findUserTask` function includes a fallback to query by the `Status` property. To ensure data consistency and prevent bugs, this fallback should be removed. The system should rely exclusively on `"Approval Status"` for moderation states.
 
+## New Code Review Findings
+
+- [ ] **[config.js]** **Hardcoded URL:** The `createDatabases` function in `config.js` uses a hardcoded URL for the EBS. This should be updated to use a dynamic URL for production environments.
+- [ ] **[ebs.js]** **Inadequate Content Moderation:** The `containsProhibited` function provides a very basic level of content moderation. This should be expanded with a more robust list of patterns or integrated with a third-party moderation service to better protect streamers and viewers.
+- [ ] **[code.html]** **Inefficient Task Updates:** The `onViewerCheckboxChange` function re-fetches all tasks after a single task's status changes. This is inefficient. Refactor to update the UI directly or only re-render the affected task.
+- [ ] **[ebs.js]** **Cache Invalidation:** The `getDataSourceId` function caches data source IDs but lacks a cache invalidation strategy. This could lead to issues if the database schema changes.
+- [ ] **[code.html]** **Client-Side JWT Decoding:** The JWT is decoded on the client-side in `code.html` to determine the user's role. This is not a security risk, but it's not ideal. This logic should be moved to the backend.
+
 ## Phase 1: Core Backend & Read-Only Overlay
 
 - [ ] **[code.html]** Build out the UI to fetch and render the `streamerTasks` and `viewerTasks` lists from the `GET /tasks` endpoint.

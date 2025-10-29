@@ -1,6 +1,13 @@
 const { STREAMER_SCHEMA, VIEWER_SCHEMA } = require("./databaseSchemas");
 const configStore = require("./configStore");
 
+/**
+ * Verify that a Notion database's properties match the expected schema.
+ *
+ * @param {string} databaseId - The Notion database ID to validate.
+ * @param {Object} expectedSchema - Schema object containing a `properties` map where each key is a property name and each value is a property config object whose primary key is the expected property type (e.g., `{ "Title": { "title": {} } }`).
+ * @returns {boolean} `true` if every property in `expectedSchema.properties` exists in the database and has the same type; `false` otherwise (also returns `false` on retrieval errors).
+ */
 async function validateSchema(notion, databaseId, expectedSchema) {
   try {
     const database = await notion.databases.retrieve({
@@ -24,6 +31,16 @@ async function validateSchema(notion, databaseId, expectedSchema) {
   }
 }
 
+/**
+ * Create a Notion database from the provided schema under the specified parent page.
+ *
+ * Properties in the schema that include a `status` field are applied in a follow-up update after the initial create.
+ * @param {object} notion - Notion SDK client used to call the Notion API.
+ * @param {object} schema - Schema object containing `name` and `properties` used to build the database.
+ * @param {string} parentPageId - ID of the parent page under which the database will be created.
+ * @returns {string} The ID of the created database.
+ * @throws {Error} If an error occurs while creating or updating the database; the original error is rethrown.
+ */
 async function createDatabase(notion, schema, parentPageId) {
   const propertiesForCreate = JSON.parse(JSON.stringify(schema.properties));
   const statusProperties = {};

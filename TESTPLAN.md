@@ -56,7 +56,7 @@ This database holds tasks submitted by viewers.
 | `Task`            | `Title`     | The name or description of the task. This is the main property.                                                  |
 | `Suggested by`    | `Rich text` | The Twitch username or opaque ID of the viewer who submitted the task.                                           |
 | `Role`            | `Select`    | The role of the submitter. Options: `Viewer`, `VIP`, `SubscriberT1`, `SubscriberT2`, `SubscriberT3`,`Moderator`. |
-| `Status`          | `Status`    | The status of the suggestion. Options: `Pending`, `Approved`, `Rejected`.                                        |
+| `Status`          | `Status`    | The status of the suggestion. Options: `Not started`, `In progress`, `Done`.                                     |
 | `Approval Status` | `Select`    | Moderation state used by the EBS migration/approval workflow. Options: `Pending`, `Approved`, `Rejected`.        |
 | `Completed`       | `Checkbox`  | A checkbox to indicate if the task has been completed by the streamer.                                           |
 

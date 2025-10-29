@@ -1,5 +1,4 @@
 const { STREAMER_SCHEMA, VIEWER_SCHEMA } = require("./databaseSchemas");
-const configStore = require("./configStore");
 
 /**
  * Verify that a Notion database's properties match the expected schema.

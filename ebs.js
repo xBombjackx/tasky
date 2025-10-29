@@ -7,8 +7,6 @@ const jwt = require("jsonwebtoken");
 const fetch = require("node-fetch");
 
 // --- Local Dependencies ---
-const configStore = require("./config/configStore");
-const setupRoutes = require("./config/setupRoutes");
 const {
   updateDatabaseSchema,
   migrateDatabase,
@@ -52,9 +50,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-
-// Initialize config store
-configStore.init().catch(console.error);
 
 // --- Twitch JWT Verification Middleware ---
 
@@ -207,9 +202,6 @@ app.post("/setup", verifyTwitchJWT, async (req, res) => {
     });
   }
 });
-
-// --- Setup Routes ---
-app.use("/setup", verifyTwitchJWT, setupRoutes);
 
 // --- API Endpoints for the Extension ---
 
@@ -684,12 +676,22 @@ async function getTasksForOverlay(streamerDbId, viewerDbId) {
       }),
     ]);
 
-    const streamerTasks = streamerResponse.results.map((page) => ({
-      id: page.id,
-      type: "streamer",
-      title: page.properties.Task?.title[0]?.plain_text || "Untitled Task",
-      status: page.properties.Status?.status?.name || "Not started",
-    }));
+    const streamerTasks = streamerResponse.results
+      .map((page) => ({
+        id: page.id,
+        type: "streamer",
+        title: page.properties.Task?.title[0]?.plain_text || "Untitled Task",
+        status: page.properties.Status?.status?.name || "Not started",
+      }))
+      .filter((t) => {
+        if (containsProhibited(t.title)) {
+          console.warn(
+            `[EBS] Hiding prohibited streamer task from overlay: ${t.id} - ${t.title}`,
+          );
+          return false;
+        }
+        return true;
+      });
 
     const viewerTasks = viewerResponse.results
       .map((page) => {

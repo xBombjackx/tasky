@@ -25,15 +25,12 @@ async function validateSchema(notion, databaseId, expectedSchema) {
 }
 
 async function createDatabase(notion, schema, parentPageId) {
-  // Deep copy the properties to avoid modifying the original schema object
   const propertiesForCreate = JSON.parse(JSON.stringify(schema.properties));
+  const statusProperties = {};
 
-  // The Notion API has a two-step process for creating status properties.
-  // First, create the database WITHOUT the status property.
-  // Then, an update call is needed to add the status property with its options.
-  // This logic removes status properties from the initial create call.
   for (const propName in propertiesForCreate) {
     if (propertiesForCreate[propName].hasOwnProperty("status")) {
+      statusProperties[propName] = propertiesForCreate[propName];
       delete propertiesForCreate[propName];
     }
   }
@@ -43,8 +40,16 @@ async function createDatabase(notion, schema, parentPageId) {
       parent: { page_id: parentPageId },
       is_inline: true,
       title: [{ type: "text", text: { content: schema.name } }],
-      properties: propertiesForCreate, // Use the modified properties
+      properties: propertiesForCreate,
     });
+
+    if (Object.keys(statusProperties).length > 0) {
+      await notion.databases.update({
+        database_id: response.id,
+        properties: statusProperties,
+      });
+    }
+
     return response.id;
   } catch (error) {
     console.error("Error creating database:", error);

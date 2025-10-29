@@ -58,18 +58,12 @@ const VIEWER_SCHEMA = {
       status: {
         options: [
           { name: "Not started", color: "default" },
-          { name: "Rejected", color: "red" },
-          { name: "Approved", color: "green" },
-          { name: "Pending", color: "yellow" },
+          { name: "In progress", color: "blue" },
           { name: "Done", color: "green" },
         ],
         groups: [
-          {
-            name: "To-do",
-            color: "gray",
-            option_ids: ["Not started", "Rejected", "Approved"],
-          },
-          { name: "In progress", color: "blue", option_ids: ["Pending"] },
+          { name: "To-do", color: "gray", option_ids: ["Not started"] },
+          { name: "In progress", color: "blue", option_ids: ["In progress"] },
           { name: "Complete", color: "green", option_ids: ["Done"] },
         ],
       },

@@ -91,6 +91,54 @@ function verifyTwitchJWT(req, res, next) {
   }
 }
 
+/**
+ * Middleware to fetch broadcaster-specific configuration.
+ * This runs after JWT verification and attaches config to the request.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ * @param {express.NextFunction} next - The Express next middleware function.
+ */
+async function loadBroadcasterConfig(req, res, next) {
+  const channelId = req.twitch.channel_id;
+  let streamerDbId = null;
+  let viewerDbId = null;
+
+  try {
+    const broadcasterConfig = await getBroadcasterConfig(
+      channelId,
+      channelId, // The API requires both user_id and channel_id to be the same for this call
+    );
+    if (broadcasterConfig) {
+      streamerDbId = broadcasterConfig.streamerDbId;
+      viewerDbId = broadcasterConfig.viewerDbId;
+    }
+  } catch (err) {
+    console.error(
+      `[EBS] Failed to get broadcaster config for channel ${channelId}, falling back to env.`,
+      err,
+    );
+  }
+
+  // Fallback to env variables if Twitch config is not available
+  req.config = {
+    streamerDbId: streamerDbId || STREAMER_DATABASE_ID,
+    viewerDbId: viewerDbId || VIEWER_DATABASE_ID,
+  };
+
+  if (!req.config.streamerDbId || !req.config.viewerDbId) {
+    console.error(
+      `[EBS] CRITICAL: Database IDs not configured for channel ${channelId}. Broadcaster must complete setup.`,
+    );
+    // Stop the request chain and return an error. The frontend should handle this.
+    return res.status(500).json({
+      message:
+        "Database IDs are not configured for this channel. The broadcaster must complete the setup process.",
+    });
+  }
+
+  next();
+}
+
 // --- Setup Endpoint ---
 
 /**
@@ -238,43 +286,8 @@ async function getBroadcasterConfig(channelId, userId) {
  * @param {express.Request} req - The Express request object.
  * @param {express.Response} res - The Express response object.
  */
-app.get("/tasks", verifyTwitchJWT, async (req, res) => {
-  const channelId = req.twitch.channel_id;
-  console.log(
-    `[EBS] Received GET /tasks request from user: ${req.twitch.user_id} for channel: ${channelId}`,
-  );
-
-  let streamerDbId;
-  let viewerDbId;
-
-  try {
-    const broadcasterConfig = await getBroadcasterConfig(
-      req.twitch.channel_id,
-      req.twitch.channel_id,
-    );
-    if (broadcasterConfig) {
-      streamerDbId = broadcasterConfig.streamerDbId;
-      viewerDbId = broadcasterConfig.viewerDbId;
-    }
-  } catch (err) {
-    console.error(
-      "[EBS] Failed to get broadcaster config from Twitch, falling back to env.",
-      err,
-    );
-  }
-
-  // Fallback to env variables if Twitch config is not available for any reason
-  streamerDbId = streamerDbId || STREAMER_DATABASE_ID;
-  viewerDbId = viewerDbId || VIEWER_DATABASE_ID;
-
-  if (!streamerDbId || !viewerDbId) {
-    console.warn(
-      `[EBS] Database IDs not found for channel ${channelId}. The broadcaster may need to run setup.`,
-    );
-    // Return empty task lists to avoid errors on the frontend
-    return res.json({ streamerTasks: [], viewerTasks: [] });
-  }
-
+app.get("/tasks", verifyTwitchJWT, loadBroadcasterConfig, async (req, res) => {
+  const { streamerDbId, viewerDbId } = req.config;
   console.log(
     `[EBS] Using streamerDbId=${streamerDbId}, viewerDbId=${viewerDbId} to fetch tasks`,
   );
@@ -298,53 +311,46 @@ app.get("/tasks", verifyTwitchJWT, async (req, res) => {
  * @param {express.Request} req - The Express request object.
  * @param {express.Response} res - The Express response object.
  */
-app.post("/tasks", verifyTwitchJWT, async (req, res) => {
-  const { taskDescription } = req.body;
+app.post(
+  "/tasks",
+  verifyTwitchJWT,
+  loadBroadcasterConfig,
+  async (req, res) => {
+    const { taskDescription } = req.body;
 
-  if (!taskDescription || taskDescription.trim().length === 0) {
-    return res
-      .status(400)
-      .json({ message: "Task description cannot be empty." });
-  }
-
-  // Block clearly prohibited content immediately to protect viewers and streamers
-  if (containsProhibited(taskDescription)) {
-    console.warn(
-      `[EBS] Rejected submission from ${req.twitch.opaque_user_id} due to prohibited content: ${taskDescription}`,
-    );
-    return res.status(400).json({
-      message: "Task contains prohibited content and was not submitted.",
-    });
-  }
-
-  const channelId = req.twitch.channel_id;
-  // Use the opaque_user_id to track who submitted the task
-  const submitterId = req.twitch.opaque_user_id;
-  console.log(
-    `[EBS] User ${submitterId} is submitting task: "${taskDescription}" for channel: ${channelId}`,
-  );
-
-  try {
-    const broadcasterConfig = await getBroadcasterConfig(
-      req.twitch.channel_id,
-      req.twitch.channel_id,
-    );
-    const viewerDbId =
-      broadcasterConfig?.viewerDbId || process.env.VIEWER_DATABASE_ID;
-
-    if (!viewerDbId) {
-      throw new Error(`No viewer database ID configured for channel ${channelId}`);
+    if (!taskDescription || taskDescription.trim().length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Task description cannot be empty." });
     }
 
-    await addViewerTask(viewerDbId, submitterId, taskDescription.trim());
-    res
-      .status(201)
-      .json({ message: "Task submitted successfully for approval!" });
-  } catch (error) {
-    console.error("Error submitting task to Notion:", error);
-    res.status(500).json({ message: "Error submitting task." });
-  }
-});
+    // Block clearly prohibited content immediately
+    if (containsProhibited(taskDescription)) {
+      console.warn(
+        `[EBS] Rejected submission from ${req.twitch.opaque_user_id} due to prohibited content: ${taskDescription}`,
+      );
+      return res.status(400).json({
+        message: "Task contains prohibited content and was not submitted.",
+      });
+    }
+
+    const { viewerDbId } = req.config;
+    const submitterId = req.twitch.opaque_user_id;
+    console.log(
+      `[EBS] User ${submitterId} is submitting task: "${taskDescription}"`,
+    );
+
+    try {
+      await addViewerTask(viewerDbId, submitterId, taskDescription.trim());
+      res
+        .status(201)
+        .json({ message: "Task submitted successfully for approval!" });
+    } catch (error) {
+      console.error("Error submitting task to Notion:", error);
+      res.status(500).json({ message: "Error submitting task." });
+    }
+  },
+);
 
 /**
  * PUT /tasks/:pageId/approve - A moderator approves a task.
@@ -440,37 +446,31 @@ app.put("/tasks/:pageId/complete", verifyTwitchJWT, async (req, res) => {
  * @param {express.Request} req - The Express request object.
  * @param {express.Response} res - The Express response object.
  */
-app.put("/tasks/me/complete", verifyTwitchJWT, async (req, res) => {
-  const opaque = req.twitch.opaque_user_id;
-  const { completed } = req.body;
+app.put(
+  "/tasks/me/complete",
+  verifyTwitchJWT,
+  loadBroadcasterConfig,
+  async (req, res) => {
+    const opaque = req.twitch.opaque_user_id;
+    const { completed } = req.body;
 
-  if (typeof completed !== "boolean") {
-    return res
-      .status(400)
-      .json({ message: "Request body must include boolean 'completed'." });
-  }
-
-  try {
-    const broadcasterConfig = await getBroadcasterConfig(
-      req.twitch.channel_id,
-      req.twitch.channel_id,
-    );
-    const viewerDbId =
-      broadcasterConfig?.viewerDbId || process.env.VIEWER_DATABASE_ID;
-
-    if (!viewerDbId) {
-      throw new Error(
-        `No viewer database ID configured for channel ${req.twitch.channel_id}`,
-      );
+    if (typeof completed !== "boolean") {
+      return res
+        .status(400)
+        .json({ message: "Request body must include boolean 'completed'." });
     }
 
-    const msg = await updateViewerTaskStatus(viewerDbId, opaque, completed);
-    res.json({ message: msg });
-  } catch (error) {
-    console.error("Error updating viewer task status:", error);
-    res.status(500).json({ message: "Error updating viewer task status." });
-  }
-});
+    const { viewerDbId } = req.config;
+
+    try {
+      const msg = await updateViewerTaskStatus(viewerDbId, opaque, completed);
+      res.json({ message: msg });
+    } catch (error) {
+      console.error("Error updating viewer task status:", error);
+      res.status(500).json({ message: "Error updating viewer task status." });
+    }
+  },
+);
 // --- Notion Helper Functions ---
 
 const dataSourceCache = new Map();
@@ -552,17 +552,8 @@ async function findUserTask(viewerDbId, opaque_user_id, approvalStatus) {
       return response.results[0];
     }
 
-    // Fallback: some installs use the `Status` property instead of `Approval Status`.
-    response = await notion.dataSources.query({
-      data_source_id: dataSourceId,
-      filter: {
-        and: [
-          { property: "Suggested by", rich_text: { equals: opaque_user_id } },
-          { property: "Status", status: { equals: approvalStatus } },
-        ],
-      },
-    });
-
+    // Fallback logic removed to enforce consistency. The app will now only
+    // respect the "Approval Status" property for moderation.
     return response.results.length > 0 ? response.results[0] : null;
   } catch (error) {
     console.error(

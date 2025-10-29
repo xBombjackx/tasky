@@ -59,11 +59,10 @@ configStore.init().catch(console.error);
 // --- Twitch JWT Verification Middleware ---
 
 /**
- * Middleware to verify the Twitch JWT.
- * Every request from the extension will have a JWT, which we must verify.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
- * @param {express.NextFunction} next - The Express next middleware function.
+ * Validate the Twitch extension JWT on incoming requests and attach the decoded token to `req.twitch`.
+ *
+ * If the Authorization header is missing or the token is invalid, responds with 401 Unauthorized.
+ * If the server is missing the configured extension secret, responds with 500 Server Misconfigured.
  */
 function verifyTwitchJWT(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1]; // Get token from "Bearer <token>"
@@ -527,11 +526,11 @@ async function getDataSourceId(databaseId) {
 }
 
 /**
- * Finds a user's task in the viewer database.
- * @param {string} viewerDbId - The ID of the viewer's task database.
- * @param {string} opaque_user_id - The opaque user ID of the viewer.
- * @param {string} approvalStatus - The approval status of the task to find (e.g., "Pending", "Approved").
- * @returns {Promise<object|null>} The Notion page object for the task, or null if not found.
+ * Locate a task in the viewer database that matches the viewer's opaque user ID and the given approval status.
+ * @param {string} viewerDbId - ID of the viewer tasks database.
+ * @param {string} opaque_user_id - The viewer's opaque user identifier.
+ * @param {string} approvalStatus - The approval status to match (e.g., "Pending", "Approved").
+ * @returns {object|null} The matching Notion page object, or `null` if no match is found.
  */
 async function findUserTask(viewerDbId, opaque_user_id, approvalStatus) {
   const dataSourceId = await getDataSourceId(viewerDbId);

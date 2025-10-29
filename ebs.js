@@ -387,6 +387,7 @@ app.put("/tasks/:pageId/approve", verifyTwitchJWT, async (req, res) => {
       page_id: pageId,
       properties: {
         "Approval Status": { select: { name: "Approved" } },
+        Status: { status: { name: "Not started" } },
       },
     });
     res.json({ message: "Task approved!" });
@@ -683,7 +684,10 @@ async function getTasksForOverlay(streamerDbId, viewerDbId) {
         database_id: viewerDbId,
         filter: {
           and: [
-            { property: "Status", status: { equals: "Approved" } },
+            {
+              property: "Approval Status",
+              select: { equals: "Approved" },
+            },
             { property: "Completed", checkbox: { equals: false } },
           ],
         },

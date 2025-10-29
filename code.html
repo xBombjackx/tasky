@@ -21,20 +21,14 @@
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="themes.css" />
     <script>
-      const urlParams = new URLSearchParams(window.location.search);
-      // We'll define the EBS_URL globally based on the 'local' param.
+      // We'll define the EBS_URL globally, but determine its value inside onAuthorized
+      // to ensure it's scoped correctly for local testing.
       let EBS_URL = "https://yummy-badgers-dream.loca.lt"; // Default to production
 
+      const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get("local") === "true") {
-        // For local testing, always use the mock Twitch helper
         document.write('<script src="mock-twitch-ext.js"><\/script>');
-        if (urlParams.get("ebs") === "notion") {
-          EBS_URL = "http://localhost:8081"; // Point to the real Notion EBS
-        } else {
-          EBS_URL = "http://localhost:8082"; // Default to the mock EBS
-        }
       } else {
-        // For production/Twitch sandbox, use the real helper
         document.write(
           '<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"><\/script>',
         );
@@ -184,6 +178,16 @@
         console.log("Twitch authorization successful!");
         authToken = auth.token;
         userId = auth.userId;
+
+        // Set EBS_URL based on 'local' and 'ebs' params for testing
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get("local") === "true") {
+          if (urlParams.get("ebs") === "notion") {
+            EBS_URL = "http://localhost:8081"; // Point to the real Notion EBS
+          } else {
+            EBS_URL = "http://localhost:8082"; // Default to the mock EBS
+          }
+        }
 
         // Decode JWT payload locally to extract opaque_user_id and role so we can
         // decide whether the current viewer may toggle a task checkbox.

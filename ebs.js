@@ -250,7 +250,7 @@ app.get("/tasks", verifyTwitchJWT, async (req, res) => {
   try {
     const broadcasterConfig = await getBroadcasterConfig(
       req.twitch.channel_id,
-      req.twitch.user_id,
+      req.twitch.channel_id,
     );
     if (broadcasterConfig) {
       streamerDbId = broadcasterConfig.streamerDbId;
@@ -327,7 +327,7 @@ app.post("/tasks", verifyTwitchJWT, async (req, res) => {
   try {
     const broadcasterConfig = await getBroadcasterConfig(
       req.twitch.channel_id,
-      req.twitch.user_id,
+      req.twitch.channel_id,
     );
     const viewerDbId =
       broadcasterConfig?.viewerDbId || process.env.VIEWER_DATABASE_ID;
@@ -453,7 +453,7 @@ app.put("/tasks/me/complete", verifyTwitchJWT, async (req, res) => {
   try {
     const broadcasterConfig = await getBroadcasterConfig(
       req.twitch.channel_id,
-      req.twitch.user_id,
+      req.twitch.channel_id,
     );
     const viewerDbId =
       broadcasterConfig?.viewerDbId || process.env.VIEWER_DATABASE_ID;

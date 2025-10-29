@@ -76,11 +76,21 @@ const mockTasks = {
   ],
 };
 
+/**
+ * GET /tasks - Mock endpoint to get the list of tasks.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.get("/tasks", (req, res) => {
   console.log("Mock EBS: Received request for /tasks");
   res.json(mockTasks);
 });
 
+/**
+ * GET /mock-jwt - Mock endpoint to generate a JWT for testing.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.get("/mock-jwt", (req, res) => {
   if (!TWITCH_EXTENSION_SECRET) {
     return res
@@ -100,6 +110,11 @@ app.get("/mock-jwt", (req, res) => {
   res.json({ token });
 });
 
+/**
+ * POST /tasks - Mock endpoint to submit a new task.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.post("/tasks", (req, res) => {
   console.log("Mock EBS: Received request for POST /tasks");
   const { title, submitter } = req.body;
@@ -145,6 +160,11 @@ app.post("/tasks", (req, res) => {
   res.status(201).json(newTask);
 });
 
+/**
+ * PUT /tasks/me/complete - Mock endpoint for a viewer to mark their own task as complete.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.put("/tasks/me/complete", (req, res) => {
   const { completed } = req.body;
   console.log(
@@ -155,6 +175,11 @@ app.put("/tasks/me/complete", (req, res) => {
   res.status(200).json({ success: true, completed: completed });
 });
 
+/**
+ * PUT /tasks/:pageId/complete - Mock endpoint for a moderator/broadcaster to mark any task as complete.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.put("/tasks/:pageId/complete", (req, res) => {
   const { pageId } = req.params;
   const { completed } = req.body;

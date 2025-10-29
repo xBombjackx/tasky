@@ -57,7 +57,14 @@ app.use((req, res, next) => {
 configStore.init().catch(console.error);
 
 // --- Twitch JWT Verification Middleware ---
-// Every request from the extension will have a JWT. We must verify it.
+
+/**
+ * Middleware to verify the Twitch JWT.
+ * Every request from the extension will have a JWT, which we must verify.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ * @param {express.NextFunction} next - The Express next middleware function.
+ */
 function verifyTwitchJWT(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1]; // Get token from "Bearer <token>"
   if (!token) {
@@ -65,6 +72,11 @@ function verifyTwitchJWT(req, res, next) {
   }
 
   try {
+    if (!TWITCH_EXTENSION_SECRET) {
+      return res
+        .status(500)
+        .send("Server misconfigured: missing extension secret");
+    }
     // The secret must be Base64 decoded, as per Twitch's documentation
     const decodedSecret = Buffer.from(TWITCH_EXTENSION_SECRET, "base64");
     const decodedToken = jwt.verify(token, decodedSecret);
@@ -80,6 +92,13 @@ function verifyTwitchJWT(req, res, next) {
 }
 
 // --- Setup Endpoint ---
+
+/**
+ * Endpoint to set up the Notion databases for the extension.
+ * This endpoint is called from the configuration page.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.post("/setup", verifyTwitchJWT, async (req, res) => {
   // Only allow broadcaster to perform setup
   if (req.twitch.role !== "broadcaster") {
@@ -149,7 +168,12 @@ app.use("/setup", verifyTwitchJWT, setupRoutes);
 
 // --- Twitch Configuration Service Helpers ---
 
-// Generates a short-lived JWT for server-to-server calls to the Twitch API
+/**
+ * Generates a short-lived JWT for server-to-server calls to the Twitch API.
+ * @param {string} channelId - The channel ID of the broadcaster.
+ * @param {string} userId - The user ID of the broadcaster.
+ * @returns {string} The generated JWT.
+ */
 function generateTwitchApiJwt(channelId, userId) {
   const payload = {
     exp: Math.floor(Date.now() / 1000) + 60, // Expires in 1 minute
@@ -161,7 +185,12 @@ function generateTwitchApiJwt(channelId, userId) {
   return jwt.sign(payload, secret);
 }
 
-// Fetches the broadcaster-specific configuration segment from the Twitch API
+/**
+ * Fetches the broadcaster-specific configuration segment from the Twitch API.
+ * @param {string} channelId - The channel ID of the broadcaster.
+ * @param {string} userId - The user ID of the broadcaster.
+ * @returns {Promise<object|null>} The broadcaster's configuration, or null if not found or an error occurs.
+ */
 async function getBroadcasterConfig(channelId, userId) {
   if (!process.env.TWITCH_CLIENT_ID) {
     console.warn(
@@ -203,8 +232,12 @@ async function getBroadcasterConfig(channelId, userId) {
   }
 }
 
-// GET /tasks - Fetches all active tasks
-// This endpoint is "public" in the sense that any viewer can see the tasks.
+/**
+ * GET /tasks - Fetches all active tasks.
+ * This endpoint is "public" in the sense that any viewer can see the tasks.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.get("/tasks", verifyTwitchJWT, async (req, res) => {
   const channelId = req.twitch.channel_id;
   console.log(
@@ -217,7 +250,7 @@ app.get("/tasks", verifyTwitchJWT, async (req, res) => {
   try {
     const broadcasterConfig = await getBroadcasterConfig(
       req.twitch.channel_id,
-      req.twitch.user_id,
+      req.twitch.channel_id,
     );
     if (broadcasterConfig) {
       streamerDbId = broadcasterConfig.streamerDbId;
@@ -260,7 +293,11 @@ app.get("/tasks", verifyTwitchJWT, async (req, res) => {
   }
 });
 
-// POST /tasks - A viewer submits a new task
+/**
+ * POST /tasks - A viewer submits a new task.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.post("/tasks", verifyTwitchJWT, async (req, res) => {
   const { taskDescription } = req.body;
 
@@ -288,7 +325,18 @@ app.post("/tasks", verifyTwitchJWT, async (req, res) => {
   );
 
   try {
-    await addViewerTask(submitterId, taskDescription.trim());
+    const broadcasterConfig = await getBroadcasterConfig(
+      req.twitch.channel_id,
+      req.twitch.channel_id,
+    );
+    const viewerDbId =
+      broadcasterConfig?.viewerDbId || process.env.VIEWER_DATABASE_ID;
+
+    if (!viewerDbId) {
+      throw new Error(`No viewer database ID configured for channel ${channelId}`);
+    }
+
+    await addViewerTask(viewerDbId, submitterId, taskDescription.trim());
     res
       .status(201)
       .json({ message: "Task submitted successfully for approval!" });
@@ -298,7 +346,11 @@ app.post("/tasks", verifyTwitchJWT, async (req, res) => {
   }
 });
 
-// PUT /tasks/:pageId/approve - A moderator approves a task
+/**
+ * PUT /tasks/:pageId/approve - A moderator approves a task.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.put("/tasks/:pageId/approve", verifyTwitchJWT, async (req, res) => {
   // We get role from the JWT, which is secure
   if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
@@ -335,6 +387,7 @@ app.put("/tasks/:pageId/approve", verifyTwitchJWT, async (req, res) => {
       page_id: pageId,
       properties: {
         "Approval Status": { select: { name: "Approved" } },
+        Status: { status: { name: "Not started" } },
       },
     });
     res.json({ message: "Task approved!" });
@@ -344,7 +397,11 @@ app.put("/tasks/:pageId/approve", verifyTwitchJWT, async (req, res) => {
   }
 });
 
-// PUT /tasks/:pageId/complete - Moderator/Broadcaster can mark a specific page as completed
+/**
+ * PUT /tasks/:pageId/complete - Moderator/Broadcaster can mark a specific page as completed.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.put("/tasks/:pageId/complete", verifyTwitchJWT, async (req, res) => {
   const { pageId } = req.params;
   const { completed } = req.body;
@@ -378,7 +435,11 @@ app.put("/tasks/:pageId/complete", verifyTwitchJWT, async (req, res) => {
   }
 });
 
-// PUT /tasks/me/complete - A viewer can mark their own approved task as completed
+/**
+ * PUT /tasks/me/complete - A viewer can mark their own approved task as completed.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.put("/tasks/me/complete", verifyTwitchJWT, async (req, res) => {
   const opaque = req.twitch.opaque_user_id;
   const { completed } = req.body;
@@ -390,7 +451,20 @@ app.put("/tasks/me/complete", verifyTwitchJWT, async (req, res) => {
   }
 
   try {
-    const msg = await updateViewerTaskStatus(opaque, completed);
+    const broadcasterConfig = await getBroadcasterConfig(
+      req.twitch.channel_id,
+      req.twitch.channel_id,
+    );
+    const viewerDbId =
+      broadcasterConfig?.viewerDbId || process.env.VIEWER_DATABASE_ID;
+
+    if (!viewerDbId) {
+      throw new Error(
+        `No viewer database ID configured for channel ${req.twitch.channel_id}`,
+      );
+    }
+
+    const msg = await updateViewerTaskStatus(viewerDbId, opaque, completed);
     res.json({ message: msg });
   } catch (error) {
     console.error("Error updating viewer task status:", error);
@@ -410,6 +484,11 @@ const PROHIBITED_PATTERNS = [
   /go\s+die/i,
 ];
 
+/**
+ * Checks if a string contains prohibited content.
+ * @param {string} text - The text to check.
+ * @returns {boolean} True if the text contains prohibited content, false otherwise.
+ */
 function containsProhibited(text) {
   if (!text || typeof text !== "string") return false;
   for (const rx of PROHIBITED_PATTERNS) {
@@ -418,6 +497,12 @@ function containsProhibited(text) {
   return false;
 }
 
+/**
+ * Gets the data source ID for a given database ID.
+ * This is used to query the Notion API for pages in a database.
+ * @param {string} databaseId - The ID of the database.
+ * @returns {Promise<string|null>} The data source ID, or null if not found or an error occurs.
+ */
 async function getDataSourceId(databaseId) {
   if (dataSourceCache.has(databaseId)) {
     return dataSourceCache.get(databaseId);
@@ -441,8 +526,15 @@ async function getDataSourceId(databaseId) {
   }
 }
 
-async function findUserTask(opaque_user_id, approvalStatus) {
-  const dataSourceId = await getDataSourceId(VIEWER_DATABASE_ID);
+/**
+ * Finds a user's task in the viewer database.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
+ * @param {string} opaque_user_id - The opaque user ID of the viewer.
+ * @param {string} approvalStatus - The approval status of the task to find (e.g., "Pending", "Approved").
+ * @returns {Promise<object|null>} The Notion page object for the task, or null if not found.
+ */
+async function findUserTask(viewerDbId, opaque_user_id, approvalStatus) {
+  const dataSourceId = await getDataSourceId(viewerDbId);
   if (!dataSourceId) return null;
   try {
     // First try to find by the new `Approval Status` property (select)
@@ -481,13 +573,20 @@ async function findUserTask(opaque_user_id, approvalStatus) {
   }
 }
 
-async function addViewerTask(opaque_user_id, taskDescription) {
+/**
+ * Adds a new task to the viewer database.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
+ * @param {string} opaque_user_id - The opaque user ID of the viewer who submitted the task.
+ * @param {string} taskDescription - The description of the task.
+ * @returns {Promise<void>}
+ */
+async function addViewerTask(viewerDbId, opaque_user_id, taskDescription) {
   try {
-    if (!VIEWER_DATABASE_ID) {
+    if (!viewerDbId) {
       throw new Error("Viewer database ID not found in environment variables.");
     }
     await notion.pages.create({
-      parent: { database_id: VIEWER_DATABASE_ID },
+      parent: { database_id: viewerDbId },
       properties: {
         Task: { title: [{ text: { content: taskDescription } }] },
         "Suggested by": { rich_text: [{ text: { content: opaque_user_id } }] },
@@ -506,8 +605,14 @@ async function addViewerTask(opaque_user_id, taskDescription) {
   }
 }
 
-async function approveViewerTask(opaque_user_id) {
-  const task = await findUserTask(opaque_user_id, "Pending");
+/**
+ * Approves a viewer's pending task.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
+ * @param {string} opaque_user_id - The opaque user ID of the viewer.
+ * @returns {Promise<string>} A message indicating the result of the operation.
+ */
+async function approveViewerTask(viewerDbId, opaque_user_id) {
+  const task = await findUserTask(viewerDbId, opaque_user_id, "Pending");
   if (task) {
     await notion.pages.update({
       page_id: task.id,
@@ -519,8 +624,14 @@ async function approveViewerTask(opaque_user_id) {
   return `No pending task found for @${opaque_user_id}.`;
 }
 
-async function rejectViewerTask(opaque_user_id) {
-  const task = await findUserTask(opaque_user_id, "Pending");
+/**
+ * Rejects a viewer's pending task.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
+ * @param {string} opaque_user_id - The opaque user ID of the viewer.
+ * @returns {Promise<string>} A message indicating the result of the operation.
+ */
+async function rejectViewerTask(viewerDbId, opaque_user_id) {
+  const task = await findUserTask(viewerDbId, opaque_user_id, "Pending");
   if (task) {
     await notion.pages.update({ page_id: task.id, archived: true });
     console.log(`[NOTION] Rejected (archived) task for ${opaque_user_id}`);
@@ -529,8 +640,15 @@ async function rejectViewerTask(opaque_user_id) {
   return `No pending task found for @${opaque_user_id} to reject.`;
 }
 
-async function updateViewerTaskStatus(opaque_user_id, isComplete) {
-  const task = await findUserTask(opaque_user_id, "Approved");
+/**
+ * Updates the completion status of a viewer's approved task.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
+ * @param {string} opaque_user_id - The opaque user ID of the viewer.
+ * @param {boolean} isComplete - True to mark the task as complete, false to mark it as not complete.
+ * @returns {Promise<string>} A message indicating the result of the operation.
+ */
+async function updateViewerTaskStatus(viewerDbId, opaque_user_id, isComplete) {
+  const task = await findUserTask(viewerDbId, opaque_user_id, "Approved");
   if (task) {
     await notion.pages.update({
       page_id: task.id,
@@ -545,6 +663,12 @@ async function updateViewerTaskStatus(opaque_user_id, isComplete) {
   return `@${opaque_user_id}, no active task found for you to update.`;
 }
 
+/**
+ * Gets the tasks to be displayed on the overlay.
+ * @param {string} streamerDbId - The ID of the streamer's task database.
+ * @param {string} viewerDbId - The ID of the viewer's task database.
+ * @returns {Promise<{streamerTasks: object[], viewerTasks: object[]}>} An object containing the streamer and viewer tasks.
+ */
 async function getTasksForOverlay(streamerDbId, viewerDbId) {
   try {
     if (!streamerDbId || !viewerDbId) {
@@ -560,7 +684,10 @@ async function getTasksForOverlay(streamerDbId, viewerDbId) {
         database_id: viewerDbId,
         filter: {
           and: [
-            { property: "Status", status: { equals: "Approved" } },
+            {
+              property: "Approval Status",
+              select: { equals: "Approved" },
+            },
             { property: "Completed", checkbox: { equals: false } },
           ],
         },
@@ -626,8 +753,16 @@ async function getTasksForOverlay(streamerDbId, viewerDbId) {
 
 // --- Server Start ---
 
-// Poll the Notion API until the schema updates have been applied.
-// This is more reliable than a fixed delay.
+/**
+ * Poll the Notion API until the schema updates have been applied.
+ * This is more reliable than a fixed delay.
+ * @param {Client} notion - The Notion API client.
+ * @param {string} databaseId - The ID of the database to check.
+ * @param {string[]} expectedProps - An array of property names that are expected to be in the schema.
+ * @param {number} timeout - The maximum time to wait in milliseconds.
+ * @param {number} interval - The polling interval in milliseconds.
+ * @returns {Promise<boolean>} True if the schema is up to date, false otherwise.
+ */
 async function waitForSchemaUpdate(
   notion,
   databaseId,
@@ -661,6 +796,12 @@ async function waitForSchemaUpdate(
   return false;
 }
 
+/**
+ * Initializes the server.
+ * This function is called at the start of the application. It updates the
+ * database schemas, migrates existing data, and starts the Express server.
+ * @returns {Promise<void>}
+ */
 async function initializeServer() {
   if (STREAMER_DATABASE_ID && VIEWER_DATABASE_ID) {
     console.log("Updating database schemas...");
@@ -709,8 +850,12 @@ async function initializeServer() {
 
 initializeServer().catch(console.error);
 
-// Debug-only endpoint to fetch tasks directly using env DB IDs (no auth).
-// This helps debugging local setups without needing a Twitch JWT.
+/**
+ * Debug-only endpoint to fetch tasks directly using env DB IDs (no auth).
+ * This helps debugging local setups without needing a Twitch JWT.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
 app.get("/_debug/tasks-local", async (req, res) => {
   try {
     const tasks = await getTasksForOverlay(

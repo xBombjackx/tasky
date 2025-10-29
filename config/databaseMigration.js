@@ -1,5 +1,12 @@
 const { Client } = require("@notionhq/client");
 
+/**
+ * Updates the schema of a Notion database to match the provided schema.
+ * @param {Client} notion - The Notion API client.
+ * @param {string} databaseId - The ID of the database to update.
+ * @param {object} schema - The schema to apply to the database.
+ * @returns {Promise<boolean>} True if the schema was updated successfully, false otherwise.
+ */
 async function updateDatabaseSchema(notion, databaseId, schema) {
   try {
     // Get current database structure
@@ -36,26 +43,6 @@ async function updateDatabaseSchema(notion, databaseId, schema) {
         properties: updates,
       });
       console.log("Database properties created successfully");
-
-      // Now, update status properties with their options since they must be created empty first
-      const statusUpdates = {};
-      for (const propName of Object.keys(updates)) {
-        if (schema.properties[propName].status) {
-          statusUpdates[propName] = schema.properties[propName];
-        }
-      }
-
-      if (Object.keys(statusUpdates).length > 0) {
-        console.log(
-          `Updating status options for properties:`,
-          Object.keys(statusUpdates),
-        );
-        await notion.databases.update({
-          database_id: databaseId,
-          properties: statusUpdates,
-        });
-        console.log("Status properties updated with options successfully");
-      }
     } else {
       console.log("Database schema is up to date");
     }
@@ -67,6 +54,14 @@ async function updateDatabaseSchema(notion, databaseId, schema) {
   }
 }
 
+/**
+ * Migrates the pages in a Notion database to match the provided schema.
+ * This function adds any missing properties to the pages.
+ * @param {Client} notion - The Notion API client.
+ * @param {string} databaseId - The ID of the database to migrate.
+ * @param {object} schema - The schema to apply to the database.
+ * @returns {Promise<boolean>} True if the migration was successful, false otherwise.
+ */
 async function migrateDatabase(notion, databaseId, schema) {
   try {
     // Retrieve current database structure so we can be sure properties exist
@@ -152,6 +147,13 @@ async function migrateDatabase(notion, databaseId, schema) {
   }
 }
 
+/**
+ * Fills the "Approval Status" property of pages in a database based on the "Status" property.
+ * This is a data migration function to ensure backward compatibility with older database schemas.
+ * @param {Client} notion - The Notion API client.
+ * @param {string} databaseId - The ID of the database to migrate.
+ * @returns {Promise<boolean>} True if the migration was successful, false otherwise.
+ */
 async function fillApprovalStatusFromStatus(notion, databaseId) {
   try {
     const response = await notion.databases.query({ database_id: databaseId });

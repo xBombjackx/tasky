@@ -6,6 +6,12 @@ window.Twitch = {
       broadcaster: {
         content: "{}", // Start with empty config
       },
+      /**
+       * Mock for the Twitch Extension Configuration Service set function.
+       * @param {string} segment - The configuration segment to set.
+       * @param {string} version - The version of the configuration.
+       * @param {string} content - The content to set.
+       */
       set: function (segment, version, content) {
         console.log("Mock Twitch: configuration.set() called.");
         console.log("  - Segment:", segment);
@@ -20,6 +26,10 @@ window.Twitch = {
     },
 
     // --- Mock Authorization ---
+    /**
+     * Mock for the Twitch Extension onAuthorized callback.
+     * @param {function} callback - The callback function to call with the auth object.
+     */
     onAuthorized: async function (callback) {
       console.log("Mock Twitch: onAuthorized() called.");
       try {
@@ -44,12 +54,20 @@ window.Twitch = {
     },
 
     // --- Mock Context ---
+    /**
+     * Mock for the Twitch Extension onContext callback.
+     * @param {function} callback - The callback function to call with the context object.
+     */
     onContext: function (callback) {
       // Mock onContext if needed, otherwise leave empty
       console.log("Mock Twitch: onContext() called.");
     },
 
     // --- Mock Visibility ---
+    /**
+     * Mock for the Twitch Extension onVisibilityChanged callback.
+     * @param {function} callback - The callback function to call with the visibility state.
+     */
     onVisibilityChanged: function (callback) {
       console.log("Mock Twitch: onVisibilityChanged() called.");
       // For local testing, we can assume the extension is always visible.

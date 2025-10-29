@@ -1,4 +1,12 @@
 // config.js
+
+/**
+ * Twitch Extension onAuthorized callback.
+ * This function is called when the extension is authorized. It retrieves the
+ * broadcaster's configuration and populates the form fields with the stored values.
+ * @param {object} auth - The Twitch authentication object.
+ * @param {string} auth.token - The JWT token for authentication with the EBS.
+ */
 window.Twitch.ext.onAuthorized(function (auth) {
   // Store auth token for later use by other functions
   window.twitchAuth = auth;
@@ -23,6 +31,10 @@ window.Twitch.ext.onAuthorized(function (auth) {
   }
 });
 
+/**
+ * Saves the configuration to the Twitch Configuration Service.
+ * This function is called when the "Save Configuration" button is clicked.
+ */
 function saveConfiguration() {
   const streamerDbId = document.getElementById("streamerDbId").value;
   const viewerDbId = document.getElementById("viewerDbId").value;
@@ -37,6 +49,12 @@ function saveConfiguration() {
   );
 }
 
+/**
+ * Creates the Notion databases required for the extension.
+ * This function is called when the "Create Databases" button is clicked.
+ * It sends a request to the EBS to create the databases and then saves
+ * the new database IDs to the configuration.
+ */
 function createDatabases() {
   const userInput = document.getElementById("parentPageId").value.trim();
   const statusEl = document.getElementById("setup-status");

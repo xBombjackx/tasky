@@ -155,6 +155,10 @@
       let abortController = null;
       let timeoutId = null;
 
+      /**
+       * Starts the polling mechanism to fetch tasks from the EBS.
+       * If polling is already active, this function does nothing.
+       */
       function startPolling() {
         if (isPolling) return;
         isPolling = true;
@@ -162,6 +166,10 @@
         fetchTasks();
       }
 
+      /**
+       * Stops the polling mechanism.
+       * This will abort any in-flight requests and clear any pending timeouts.
+       */
       function stopPolling() {
         isPolling = false;
         if (abortController) {
@@ -174,6 +182,11 @@
         }
       }
 
+      /**
+       * Twitch onAuthorized callback.
+       * This is called when the extension is authorized by Twitch.
+       * @param {object} auth - The Twitch authorization object.
+       */
       twitch.onAuthorized(async (auth) => {
         console.log("Twitch authorization successful!");
         authToken = auth.token;
@@ -206,6 +219,11 @@
         startPolling();
       });
 
+      /**
+       * Twitch onVisibilityChanged callback.
+       * This is called when the extension's visibility changes.
+       * @param {boolean} isVisible - True if the extension is visible, false otherwise.
+       */
       twitch.onVisibilityChanged((isVisible) => {
         if (isVisible) {
           startPolling();
@@ -214,7 +232,11 @@
         }
       });
 
-      // Helper: mark the current viewer's approved task as completed (or not)
+      /**
+       * Marks the current viewer's approved task as completed (or not).
+       * @param {boolean} isComplete - True to mark the task as complete, false otherwise.
+       * @returns {Promise<boolean>} - True if the operation was successful, false otherwise.
+       */
       async function markMyTaskComplete(isComplete) {
         if (!authToken) return false;
         try {
@@ -238,7 +260,12 @@
         }
       }
 
-      // Helper: moderator/broadcaster can mark any page complete by pageId
+      /**
+       * Marks a specific page as complete by a moderator or broadcaster.
+       * @param {string} pageId - The ID of the page to mark as complete.
+       * @param {boolean} isComplete - True to mark the task as complete, false otherwise.
+       * @returns {Promise<boolean>} - True if the operation was successful, false otherwise.
+       */
       async function markPageCompleteAsMod(pageId, isComplete) {
         if (!authToken) return false;
         try {
@@ -266,10 +293,15 @@
         }
       }
 
-      // Called when a viewer checkbox is toggled. If the current viewer owns the task
-      // then call the /tasks/me/complete endpoint. If the user is a moderator/broadcaster
-      // (decodedRole), call the moderator endpoint for the specific pageId. Otherwise
-      // revert the checkbox and show a brief message.
+      /**
+       * Handles the change event for viewer task checkboxes.
+       * If the current viewer owns the task, it calls the /tasks/me/complete endpoint.
+       * If the user is a moderator/broadcaster, it calls the moderator endpoint.
+       * Otherwise, it reverts the checkbox and shows an alert.
+       * @param {Event} event - The checkbox change event.
+       * @param {string} pageId - The ID of the page associated with the task.
+       * @param {string} submitterOpaque - The opaque user ID of the task submitter.
+       */
       async function onViewerCheckboxChange(event, pageId, submitterOpaque) {
         const checked = event.target.checked;
         // Allow the owner to mark their own approved task complete
@@ -302,6 +334,11 @@
         event.target.checked = !checked;
       }
 
+      /**
+       * Fetches tasks from the EBS and updates the UI.
+       * If polling is disabled or auth token is not available, this function does nothing.
+       * It also handles aborting the request if polling is stopped.
+       */
       async function fetchTasks() {
         if (!authToken || !isPolling) {
           return;
@@ -346,6 +383,11 @@
         }
       }
 
+      /**
+       * Updates the task counter and progress bar based on the fetched tasks.
+       * @param {Array} streamerTasks - The list of streamer tasks.
+       * @param {Array} viewerTasks - The list of viewer tasks.
+       */
       function updateTaskCounter(streamerTasks, viewerTasks) {
         const allTasks = [...streamerTasks, ...viewerTasks];
         const completedTasks = allTasks.filter((task) => task.completed).length;
@@ -363,6 +405,10 @@
         }
       }
 
+      /**
+       * Renders the streamer tasks in the UI.
+       * @param {Array} tasks - The list of streamer tasks to render.
+       */
       function renderStreamerTasks(tasks) {
         streamerTasksDiv.innerHTML = ""; // Clear existing tasks
         if (tasks.length === 0) {
@@ -396,6 +442,10 @@
         });
       }
 
+      /**
+       * Renders the viewer tasks in the UI.
+       * @param {Array} tasks - The list of viewer tasks to render.
+       */
       function renderViewerTasks(tasks) {
         viewerTasksDiv.innerHTML = ""; // Clear existing tasks
         if (tasks.length === 0) {

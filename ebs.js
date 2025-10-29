@@ -40,6 +40,12 @@ app.use(cors()); // Allow requests from the Twitch extension frontend
 app.use(express.json()); // Allow the server to parse JSON request bodies
 
 // Simple request logger to aid debugging during local development
+/**
+ * Middleware for logging HTTP requests.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
+ * @param {import('express').NextFunction} next - The Express next middleware function.
+ */
 app.use((req, res, next) => {
   try {
     console.log(`[HTTP] ${req.method} ${req.path} - headers:`, {
@@ -58,6 +64,9 @@ app.use((req, res, next) => {
  *
  * If the Authorization header is missing or the token is invalid, responds with 401 Unauthorized.
  * If the server is missing the configured extension secret, responds with 500 Server Misconfigured.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
+ * @param {import('express').NextFunction} next - The Express next middleware function.
  */
 function verifyTwitchJWT(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1]; // Get token from "Bearer <token>"
@@ -88,9 +97,9 @@ function verifyTwitchJWT(req, res, next) {
 /**
  * Middleware to fetch broadcaster-specific configuration.
  * This runs after JWT verification and attaches config to the request.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
- * @param {express.NextFunction} next - The Express next middleware function.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
+ * @param {import('express').NextFunction} next - The Express next middleware function.
  */
 async function loadBroadcasterConfig(req, res, next) {
   const channelId = req.twitch.channel_id;
@@ -138,8 +147,8 @@ async function loadBroadcasterConfig(req, res, next) {
 /**
  * Endpoint to set up the Notion databases for the extension.
  * This endpoint is called from the configuration page.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
  */
 app.post("/setup", verifyTwitchJWT, async (req, res) => {
   // Only allow broadcaster to perform setup
@@ -274,8 +283,8 @@ async function getBroadcasterConfig(channelId, userId) {
 /**
  * GET /tasks - Fetches all active tasks.
  * This endpoint is "public" in the sense that any viewer can see the tasks.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
  */
 app.get("/tasks", verifyTwitchJWT, loadBroadcasterConfig, async (req, res) => {
   const { streamerDbId, viewerDbId } = req.config;
@@ -299,8 +308,8 @@ app.get("/tasks", verifyTwitchJWT, loadBroadcasterConfig, async (req, res) => {
 
 /**
  * POST /tasks - A viewer submits a new task.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
  */
 app.post(
   "/tasks",
@@ -345,8 +354,8 @@ app.post(
 
 /**
  * PUT /tasks/:pageId/approve - A moderator approves a task.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
  */
 app.put("/tasks/:pageId/approve", verifyTwitchJWT, async (req, res) => {
   // We get role from the JWT, which is secure
@@ -396,8 +405,8 @@ app.put("/tasks/:pageId/approve", verifyTwitchJWT, async (req, res) => {
 
 /**
  * PUT /tasks/:pageId/complete - Moderator/Broadcaster can mark a specific page as completed.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
  */
 app.put("/tasks/:pageId/complete", verifyTwitchJWT, async (req, res) => {
   const { pageId } = req.params;
@@ -434,8 +443,8 @@ app.put("/tasks/:pageId/complete", verifyTwitchJWT, async (req, res) => {
 
 /**
  * PUT /tasks/me/complete - A viewer can mark their own approved task as completed.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
  */
 app.put(
   "/tasks/me/complete",
@@ -845,8 +854,8 @@ initializeServer().catch(console.error);
 /**
  * Debug-only endpoint to fetch tasks directly using env DB IDs (no auth).
  * This helps debugging local setups without needing a Twitch JWT.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
  */
 app.get("/_debug/tasks-local", async (req, res) => {
   try {

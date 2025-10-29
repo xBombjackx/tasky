@@ -27,6 +27,7 @@ These tasks address items from the code review and should be completed before bu
 
 ## New Code Review Findings
 
+- [ ] **Docstrings:** Add JSDoc comments to all functions in `ebs.js`, `code.html`, `config.js`, and `mock-ebs.js` to improve code clarity and maintainability.
 - [ ] **[config.js]** **Hardcoded URL:** The `createDatabases` function in `config.js` uses a hardcoded URL for the EBS. This should be updated to use a dynamic URL for production environments.
 - [ ] **[ebs.js]** **Inadequate Content Moderation:** The `containsProhibited` function provides a very basic level of content moderation. This should be expanded with a more robust list of patterns or integrated with a third-party moderation service to better protect streamers and viewers.
 - [ ] **[code.html]** **Inefficient Task Updates:** The `onViewerCheckboxChange` function re-fetches all tasks after a single task's status changes. This is inefficient. Refactor to update the UI directly or only re-render the affected task.

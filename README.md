@@ -75,4 +75,4 @@ tasks and even submit their own tasks for approval.
 
 For detailed instructions on how to test the extension locally, including both
 the UI with mock data and the full Notion integration, please see the
-[TESTPLAN.md](TESTPLAN.md) file.
+[LOCAL_TESTING.md](LOCAL_TESTING.md) file.

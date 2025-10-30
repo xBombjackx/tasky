@@ -87,6 +87,19 @@ app.get("/tasks", (req, res) => {
 });
 
 /**
+ * GET /tasks/pending - Mock endpoint to get pending tasks.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
+app.get("/tasks/pending", (req, res) => {
+  console.log("Mock EBS: Received request for /tasks/pending");
+  const pendingTasks = mockTasks.viewerTasks.filter(
+    (task) => task.status === "Pending",
+  );
+  res.json(pendingTasks);
+});
+
+/**
  * GET /mock-jwt - Mock endpoint to generate a JWT for testing.
  * @param {express.Request} req - The Express request object.
  * @param {express.Response} res - The Express response object.

@@ -212,6 +212,35 @@ app.post("/setup", verifyTwitchJWT, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /tasks/:pageId - A moderator rejects a task.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
+ */
+app.delete("/tasks/:pageId", verifyTwitchJWT, async (req, res) => {
+  if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
+    return res
+      .status(403)
+      .send("Forbidden: Only moderators or the broadcaster can reject tasks.");
+  }
+  const { pageId } = req.params;
+  console.log(
+    `[EBS] Mod/Broadcaster is rejecting task with page ID: ${pageId}`,
+  );
+
+  try {
+    await notion.pages.update({
+      page_id: pageId,
+      archived: true, // Archiving is a soft delete
+      properties: { "Approval Status": { select: { name: "Rejected" } } },
+    });
+    res.json({ message: "Task rejected and archived!" });
+  } catch (error) {
+    console.error("Error rejecting task in Notion:", error);
+    res.status(500).json({ message: "Error rejecting task." });
+  }
+});
+
 // --- API Endpoints for the Extension ---
 
 // --- Twitch Configuration Service Helpers ---
@@ -305,6 +334,55 @@ app.get("/tasks", verifyTwitchJWT, loadBroadcasterConfig, async (req, res) => {
       .json({ message: "Internal server error.", error: error.message });
   }
 });
+
+/**
+ * GET /tasks/pending - Fetches tasks awaiting approval.
+ * This endpoint is restricted to moderators and broadcasters.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
+ */
+app.get(
+  "/tasks/pending",
+  verifyTwitchJWT,
+  loadBroadcasterConfig,
+  async (req, res) => {
+    if (
+      req.twitch.role !== "broadcaster" &&
+      req.twitch.role !== "moderator"
+    ) {
+      return res
+        .status(403)
+        .send(
+          "Forbidden: Only moderators or the broadcaster can view pending tasks.",
+        );
+    }
+
+    const { viewerDbId } = req.config;
+
+    try {
+      const response = await notion.databases.query({
+        database_id: viewerDbId,
+        filter: {
+          property: "Approval Status",
+          select: { equals: "Pending" },
+        },
+      });
+
+      const pendingTasks = response.results.map((page) => ({
+        id: page.id,
+        title: page.properties.Task?.title[0]?.plain_text || "Untitled Task",
+        submitter:
+          page.properties["Suggested by"]?.rich_text[0]?.plain_text ||
+          "Unknown",
+      }));
+
+      res.json(pendingTasks);
+    } catch (error) {
+      console.error("Error fetching pending tasks from Notion:", error);
+      res.status(500).json({ message: "Error fetching pending tasks." });
+    }
+  },
+);
 
 /**
  * POST /tasks - A viewer submits a new task.

@@ -44,7 +44,6 @@ This database holds tasks for the streamer.
 | ------------- | ---------- | ------------------------------------------------------------------------------ |
 | `Task`        | `Title`    | The name or description of the task. This is the main property.                |
 | `Status`      | `Status`   | The current status of the task. Options: `Not started`, `In progress`, `Done`. |
-| `Cost`        | `Number`   | (Optional) The cost of the task, e.g., in channel points.                      |
 | `Completed`   | `Checkbox` | A checkbox to indicate if the task is completed.                               |
 
 ### Viewer Tasks Database Schema
@@ -56,8 +55,8 @@ This database holds tasks submitted by viewers.
 | `Task`            | `Title`     | The name or description of the task. This is the main property.                                                  |
 | `Suggested by`    | `Rich text` | The Twitch username or opaque ID of the viewer who submitted the task.                                           |
 | `Role`            | `Select`    | The role of the submitter. Options: `Viewer`, `VIP`, `SubscriberT1`, `SubscriberT2`, `SubscriberT3`,`Moderator`. |
-| `Status`          | `Status`    | The status of the suggestion. Options: `Not started`, `In progress`, `Done`.                                     |
-| `Approval Status` | `Select`    | Moderation state used by the EBS migration/approval workflow. Options: `Pending`, `Approved`, `Rejected`.        |
+| `Status`          | `Status`    | The lifecycle status of the task *after* it has been approved. Options: `Not started`, `In progress`, `Done`.   |
+| `Approval Status` | `Select`    | The moderation state of a submitted task. Options: `Pending`, `Approved`, `Rejected`.                             |
 | `Completed`       | `Checkbox`  | A checkbox to indicate if the task has been completed by the streamer.                                           |
 
 **Note:** Ensure the property names in your Notion databases match exactly what
@@ -139,10 +138,16 @@ Helper scripts (in `scripts/`):
   overlay and prints page samples.
 - `print-notion-schema.js` — Prints Notion database property names and types for
   the configured DBs.
+- `check-schema.js` — Compares the live Notion database schema against the
+  local `config/databaseSchemas.js` definition and prints a diff.
 - `fill-approval-status.js` — Fills `Approval Status` select on existing viewer
   pages using their `Status` values (migration helper).
 - `auto-reject-prohibited.js` — Scans viewer DB titles for prohibited content
   and archives + marks `Approval Status=Rejected`.
+- `mark-my-task-complete.js` — Simulates a viewer marking their own task as
+  complete by calling the `PUT /tasks/me/complete` endpoint.
+- `test-put-page-complete.js` — Tests the moderator endpoint (`PUT /tasks/:pageId/complete`)
+  by marking a specific page as complete.
 
 ### Example: Approving a viewer task (power user)
 

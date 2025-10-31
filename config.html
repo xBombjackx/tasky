@@ -221,7 +221,6 @@
         if (!authToken) return;
         const EBS_URL = getEbsUrl();
         try {
-          // We will implement the DELETE endpoint in the next step
           const response = await fetch(`${EBS_URL}/tasks/${pageId}`, {
             method: "DELETE",
             headers: {

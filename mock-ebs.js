@@ -202,6 +202,36 @@ app.put("/tasks/:pageId/complete", (req, res) => {
   res.status(200).json({ success: true, pageId: pageId, completed: completed });
 });
 
+/**
+ * PUT /tasks/:pageId/approve - Mock endpoint for a moderator to approve a task.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
+app.put("/tasks/:pageId/approve", (req, res) => {
+  const { pageId } = req.params;
+  console.log(`Mock EBS: Approving task ${pageId}`);
+  const task = mockTasks.viewerTasks.find((t) => t.id === pageId);
+  if (task) {
+    task.status = "Approved";
+  }
+  res.status(200).json({ message: "Task approved!" });
+});
+
+/**
+ * DELETE /tasks/:pageId - Mock endpoint for a moderator to reject a task.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
+app.delete("/tasks/:pageId", (req, res) => {
+  const { pageId } = req.params;
+  console.log(`Mock EBS: Rejecting task ${pageId}`);
+  const task = mockTasks.viewerTasks.find((t) => t.id === pageId);
+  if (task) {
+    task.status = "Rejected";
+  }
+  res.status(200).json({ message: "Task rejected!" });
+});
+
 app.listen(PORT, () => {
   console.log(`Mock EBS server running on http://localhost:${PORT}`);
 });

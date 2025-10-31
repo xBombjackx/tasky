@@ -111,6 +111,129 @@
       </div>
     </div>
 
+    <!-- Moderation Section -->
+    <div
+      class="max-w-2xl mx-auto mt-8 bg-background-dark/80 rounded-xl border border-border-color/50 p-6"
+    >
+      <h2 class="text-xl font-semibold mb-4">Pending Tasks</h2>
+      <div id="pending-tasks-container" class="space-y-4">
+        <!-- Pending tasks will be dynamically inserted here -->
+      </div>
+      <p id="moderation-status" class="text-sm mt-4"></p>
+    </div>
+
     <script src="config.js"></script>
+    <script>
+      // Additional script for moderation functionality
+      const twitch = window.Twitch.ext;
+      let authToken = null;
+
+      twitch.onAuthorized((auth) => {
+        authToken = auth.token;
+        // Fetch pending tasks once authorized
+        fetchPendingTasks();
+      });
+
+      function getEbsUrl() {
+        const url = new URL(window.location.href);
+        const isLocal = url.searchParams.get("local") === "true";
+        return isLocal
+          ? "http://localhost:8082"
+          : "https://your-production-ebs-url.com"; // Replace with your actual prod URL
+      }
+
+      async function fetchPendingTasks() {
+        if (!authToken) return;
+
+        const EBS_URL = getEbsUrl();
+        const container = document.getElementById("pending-tasks-container");
+        const statusEl = document.getElementById("moderation-status");
+
+        try {
+          const response = await fetch(`${EBS_URL}/tasks/pending`, {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || "Failed to fetch pending tasks.");
+          }
+
+          const tasks = await response.json();
+          container.innerHTML = ""; // Clear previous tasks
+
+          if (tasks.length === 0) {
+            container.innerHTML = `<p class="text-text-muted">No tasks are currently pending approval.</p>`;
+          } else {
+            tasks.forEach((task) => {
+              const taskEl = document.createElement("div");
+              taskEl.className =
+                "flex items-center justify-between p-4 bg-background-light/10 rounded-lg";
+              taskEl.innerHTML = `
+                <div>
+                  <p class="font-semibold text-text-light">${
+                    task.title
+                  }</p>
+                  <p class="text-sm text-text-muted">Suggested by: ${
+                    task.submitter
+                  }</p>
+                </div>
+                <div class="flex space-x-2">
+                  <button onclick="approveTask('${
+                    task.id
+                  }')" class="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700">Approve</button>
+                  <button onclick="rejectTask('${
+                    task.id
+                  }')" class="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700">Reject</button>
+                </div>
+              `;
+              container.appendChild(taskEl);
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching pending tasks:", error);
+          statusEl.textContent = `Error: ${error.message}`;
+          statusEl.className = "text-red-500 text-sm mt-4";
+        }
+      }
+
+      async function approveTask(pageId) {
+        if (!authToken) return;
+        const EBS_URL = getEbsUrl();
+        try {
+          const response = await fetch(`${EBS_URL}/tasks/${pageId}/approve`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+          if (response.ok) {
+            fetchPendingTasks(); // Refresh the list
+          }
+        } catch (error) {
+          console.error("Error approving task:", error);
+        }
+      }
+
+      async function rejectTask(pageId) {
+        if (!authToken) return;
+        const EBS_URL = getEbsUrl();
+        try {
+          const response = await fetch(`${EBS_URL}/tasks/${pageId}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+          if (response.ok) {
+            fetchPendingTasks(); // Refresh the list
+          }
+        } catch (error) {
+          console.error("Error rejecting task:", error);
+        }
+      }
+    </script>
   </body>
 </html>

@@ -87,6 +87,19 @@ app.get("/tasks", (req, res) => {
 });
 
 /**
+ * GET /tasks/pending - Mock endpoint to get pending tasks.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
+app.get("/tasks/pending", (req, res) => {
+  console.log("Mock EBS: Received request for /tasks/pending");
+  const pendingTasks = mockTasks.viewerTasks.filter(
+    (task) => task.status === "Pending",
+  );
+  res.json(pendingTasks);
+});
+
+/**
  * GET /mock-jwt - Mock endpoint to generate a JWT for testing.
  * @param {express.Request} req - The Express request object.
  * @param {express.Response} res - The Express response object.
@@ -95,7 +108,7 @@ app.get("/mock-jwt", (req, res) => {
   if (!TWITCH_EXTENSION_SECRET) {
     return res
       .status(500)
-      .send("TWITCH_EXTENSION_SECRET is not set in .env file.");
+      .json({ message: "TWITCH_EXTENSION_SECRET is not set in .env file." });
   }
   const secret = Buffer.from(TWITCH_EXTENSION_SECRET, "base64");
   const payload = {
@@ -187,6 +200,36 @@ app.put("/tasks/:pageId/complete", (req, res) => {
     `Mock EBS: Received request for PUT /tasks/${pageId}/complete with completed: ${completed}`,
   );
   res.status(200).json({ success: true, pageId: pageId, completed: completed });
+});
+
+/**
+ * PUT /tasks/:pageId/approve - Mock endpoint for a moderator to approve a task.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
+app.put("/tasks/:pageId/approve", (req, res) => {
+  const { pageId } = req.params;
+  console.log(`Mock EBS: Approving task ${pageId}`);
+  const task = mockTasks.viewerTasks.find((t) => t.id === pageId);
+  if (task) {
+    task.status = "Approved";
+  }
+  res.status(200).json({ message: "Task approved!" });
+});
+
+/**
+ * DELETE /tasks/:pageId - Mock endpoint for a moderator to reject a task.
+ * @param {express.Request} req - The Express request object.
+ * @param {express.Response} res - The Express response object.
+ */
+app.delete("/tasks/:pageId", (req, res) => {
+  const { pageId } = req.params;
+  console.log(`Mock EBS: Rejecting task ${pageId}`);
+  const task = mockTasks.viewerTasks.find((t) => t.id === pageId);
+  if (task) {
+    task.status = "Rejected";
+  }
+  res.status(200).json({ message: "Task rejected!" });
 });
 
 app.listen(PORT, () => {

@@ -1,9 +1,7 @@
-// config.js
-
 /**
  * Twitch Extension onAuthorized callback.
  * This function is called when the extension is authorized. It retrieves the
- * broadcaster's configuration and populates the form fields with the stored values.
+ * broadcaster's configuration, populates the form fields, and fetches pending tasks.
  * @param {object} auth - The Twitch authentication object.
  * @param {string} auth.token - The JWT token for authentication with the EBS.
  */
@@ -29,6 +27,14 @@ window.Twitch.ext.onAuthorized(function (auth) {
   } catch (e) {
     console.error("Error parsing configuration:", e);
   }
+
+  // Fetch pending tasks now that we are authorized.
+  // This function is defined in the inline script on config.html
+  if (typeof fetchPendingTasks === "function") {
+    fetchPendingTasks();
+  } else {
+    console.error("fetchPendingTasks() function not found.");
+  }
 });
 
 /**
@@ -45,7 +51,7 @@ function saveConfiguration() {
     JSON.stringify({
       streamerDbId: streamerDbId,
       viewerDbId: viewerDbId,
-    })
+    }),
   );
 }
 
@@ -109,7 +115,7 @@ function createDatabases() {
             throw new Error(err.message || "Setup failed with no error message.");
           })
           .catch(() => {
-            throw new Error(`Setup failed with status: ${response.status}`)
+            throw new Error(`Setup failed with status: ${response.status}`);
           });
       }
       return response.json();

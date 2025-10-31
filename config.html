@@ -39,7 +39,6 @@
     <div class="max-w-2xl mx-auto">
       <h1 class="text-3xl font-bold mb-8">Tasky Configuration</h1>
 
-      <!-- Initial Setup Section -->
       <div
         class="bg-background-dark/80 rounded-xl border border-border-color/50 p-6 mb-6"
       >
@@ -67,7 +66,6 @@
         <p id="setup-status" class="text-sm mt-4"></p>
       </div>
 
-      <!-- Database Setup Section -->
       <div
         class="bg-background-dark/80 rounded-xl border border-border-color/50 p-6 mb-6"
       >
@@ -99,7 +97,6 @@
         </div>
       </div>
 
-      <!-- Action Buttons -->
       <div class="flex justify-end space-x-4">
         <button
           id="save-config"
@@ -111,6 +108,163 @@
       </div>
     </div>
 
+    <div
+      class="max-w-2xl mx-auto mt-8 bg-background-dark/80 rounded-xl border border-border-color/50 p-6"
+    >
+      <h2 class="text-xl font-semibold mb-4">Pending Tasks</h2>
+      <div id="pending-tasks-container" class="space-y-4">
+        </div>
+      <p id="moderation-status" class="text-sm mt-4"></p>
+    </div>
+
     <script src="config.js"></script>
+    <script>
+      // Additional script for moderation functionality
+      const twitch = window.Twitch.ext;
+
+      // ----- MODIFICATIONS -----
+      // Removed: let authToken = null;
+      // Removed: twitch.onAuthorized(...) block.
+      // This logic is now consolidated in config.js
+      // -------------------------
+
+      function getEbsUrl() {
+        const url = new URL(window.location.href);
+        const isLocal = url.searchParams.get("local") === "true";
+        return isLocal
+          ? "http://localhost:8082"
+          : "https://your-production-ebs-url.com"; // Replace with your actual prod URL
+      }
+
+      async function fetchPendingTasks() {
+        // ----- MODIFICATION -----
+        // Use the global twitchAuth object set by config.js
+        if (!window.twitchAuth || !window.twitchAuth.token) {
+          console.log("fetchPendingTasks: Not authorized yet, waiting.");
+          return;
+        }
+        // -------------------------
+
+        const EBS_URL = getEbsUrl();
+        const container = document.getElementById("pending-tasks-container");
+        const statusEl = document.getElementById("moderation-status");
+
+        try {
+          const response = await fetch(`${EBS_URL}/tasks/pending`, {
+            headers: {
+              // ----- MODIFICATION -----
+              Authorization: `Bearer ${window.twitchAuth.token}`, // Use global auth token
+              // -------------------------
+            },
+          });
+
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || "Failed to fetch pending tasks.");
+          }
+
+          const tasks = await response.json();
+          container.innerHTML = ""; // Clear previous tasks
+
+          if (tasks.length === 0) {
+            const noTasksEl = document.createElement("p");
+            noTasksEl.className = "text-text-muted";
+            noTasksEl.textContent = "No tasks are currently pending approval.";
+            container.appendChild(noTasksEl);
+          } else {
+            tasks.forEach((task) => {
+              // Create elements securely
+              const taskEl = document.createElement("div");
+              taskEl.className =
+                "flex items-center justify-between p-4 bg-background-light/10 rounded-lg";
+
+              const textContainer = document.createElement("div");
+
+              const titleEl = document.createElement("p");
+              titleEl.className = "font-semibold text-text-light";
+              titleEl.textContent = task.title; // Securely set text content
+
+              const submitterEl = document.createElement("p");
+              submitterEl.className = "text-sm text-text-muted";
+              submitterEl.textContent = `Suggested by: ${task.submitter}`; // Securely set text content
+
+              textContainer.appendChild(titleEl);
+              textContainer.appendChild(submitterEl);
+
+              const buttonContainer = document.createElement("div");
+              buttonContainer.className = "flex space-x-2";
+
+              const approveButton = document.createElement("button");
+              approveButton.textContent = "Approve";
+              approveButton.className =
+                "bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700";
+              approveButton.addEventListener("click", () => approveTask(task.id));
+
+              const rejectButton = document.createElement("button");
+              rejectButton.textContent = "Reject";
+              rejectButton.className =
+                "bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700";
+              rejectButton.addEventListener("click", () => rejectTask(task.id));
+
+              buttonContainer.appendChild(approveButton);
+              buttonContainer.appendChild(rejectButton);
+
+              taskEl.appendChild(textContainer);
+              taskEl.appendChild(buttonContainer);
+
+              container.appendChild(taskEl);
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching pending tasks:", error);
+          statusEl.textContent = `Error: ${error.message}`;
+          statusEl.className = "text-red-500 text-sm mt-4";
+        }
+      }
+
+      async function approveTask(pageId) {
+        // ----- MODIFICATION -----
+        if (!window.twitchAuth || !window.twitchAuth.token) return; // Use global auth token
+        // -------------------------
+        const EBS_URL = getEbsUrl();
+        try {
+          const response = await fetch(`${EBS_URL}/tasks/${pageId}/approve`, {
+            method: "PUT",
+            headers: {
+              // ----- MODIFICATION -----
+              Authorization: `Bearer ${window.twitchAuth.token}`, // Use global auth token
+              // -------------------------
+            },
+          });
+          if (response.ok) {
+            fetchPendingTasks(); // Refresh the list
+          }
+        } catch (error) {
+          console.error("Error approving task:", error);
+        }
+      }
+
+      async function rejectTask(pageId) {
+        // ----- MODIFICATION -----
+        if (!window.twitchAuth || !window.twitchAuth.token) return; // Use global auth token
+        // -------------------------
+        const EBS_URL = getEbsUrl();
+        try {
+          const response = await fetch(`${EBS_URL}/tasks/${pageId}`, {
+            method: "DELETE",
+            headers: {
+              // ----- MODIFICATION -----
+              Authorization: `Bearer ${window.twitchAuth.token}`, // Use global auth token
+              // -------------------------
+            },
+          });
+          if (response.ok) {
+            fetchPendingTasks(); // Refresh the list
+          }
+        } catch (error) {
+          console.error("Error rejecting task:", error);
+        }
+      }
+    </script>
   </body>
 </html>

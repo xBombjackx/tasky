@@ -5,6 +5,7 @@ const cors = require("cors");
 const { Client } = require("@notionhq/client");
 const jwt = require("jsonwebtoken");
 const fetch = require("node-fetch");
+const rateLimit = require("express-rate-limit");
 
 // --- Local Dependencies ---
 const {
@@ -39,6 +40,14 @@ const notion = new Client({ auth: NOTION_API_KEY });
 app.use(cors()); // Allow requests from the Twitch extension frontend
 app.use(express.json()); // Allow the server to parse JSON request bodies
 
+// --- Rate Limiting ---
+const modRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Simple request logger to aid debugging during local development
 /**
  * Middleware for logging HTTP requests.
@@ -71,14 +80,14 @@ app.use((req, res, next) => {
 function verifyTwitchJWT(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1]; // Get token from "Bearer <token>"
   if (!token) {
-    return res.status(401).send("Unauthorized: Missing token");
+    return res.status(401).json({ message: "Unauthorized: Missing token" });
   }
 
   try {
     if (!TWITCH_EXTENSION_SECRET) {
       return res
         .status(500)
-        .send("Server misconfigured: missing extension secret");
+        .json({ message: "Server misconfigured: missing extension secret" });
     }
     // The secret must be Base64 decoded, as per Twitch's documentation
     const decodedSecret = Buffer.from(TWITCH_EXTENSION_SECRET, "base64");
@@ -90,7 +99,7 @@ function verifyTwitchJWT(req, res, next) {
     next(); // Token is valid, proceed to the actual API endpoint
   } catch (err) {
     console.error("JWT Verification Error:", err.message);
-    return res.status(401).send("Unauthorized: Invalid token");
+    return res.status(401).json({ message: "Unauthorized: Invalid token" });
   }
 }
 
@@ -153,12 +162,14 @@ async function loadBroadcasterConfig(req, res, next) {
 app.post("/setup", verifyTwitchJWT, async (req, res) => {
   // Only allow broadcaster to perform setup
   if (req.twitch.role !== "broadcaster") {
-    return res.status(403).send("Only the broadcaster can perform setup");
+    return res
+      .status(403)
+      .json({ message: "Only the broadcaster can perform setup" });
   }
 
   const { parentPageId } = req.body;
   if (!parentPageId) {
-    return res.status(400).send("Parent page ID is required");
+    return res.status(400).json({ message: "Parent page ID is required" });
   }
 
   try {
@@ -211,6 +222,40 @@ app.post("/setup", verifyTwitchJWT, async (req, res) => {
     });
   }
 });
+
+/**
+ * DELETE /tasks/:pageId - A moderator rejects a task.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
+ */
+app.delete(
+  "/tasks/:pageId",
+  modRateLimiter,
+  verifyTwitchJWT,
+  async (req, res) => {
+    if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
+      return res.status(403).json({
+        message: "Forbidden: Only moderators or the broadcaster can reject tasks.",
+      });
+    }
+    const { pageId } = req.params;
+    console.log(
+      `[EBS] Mod/Broadcaster is rejecting task with page ID: ${pageId}`,
+    );
+
+    try {
+      await notion.pages.update({
+        page_id: pageId,
+        archived: true, // Archiving is a soft delete
+        properties: { "Approval Status": { select: { name: "Rejected" } } },
+      });
+      res.json({ message: "Task rejected and archived!" });
+    } catch (error) {
+      console.error("Error rejecting task in Notion:", error);
+      res.status(500).json({ message: "Error rejecting task." });
+    }
+  },
+);
 
 // --- API Endpoints for the Extension ---
 
@@ -307,6 +352,55 @@ app.get("/tasks", verifyTwitchJWT, loadBroadcasterConfig, async (req, res) => {
 });
 
 /**
+ * GET /tasks/pending - Fetches tasks awaiting approval.
+ * This endpoint is restricted to moderators and broadcasters.
+ * @param {import('express').Request} req - The Express request object.
+ * @param {import('express').Response} res - The Express response object.
+ */
+app.get(
+  "/tasks/pending",
+  modRateLimiter,
+  verifyTwitchJWT,
+  loadBroadcasterConfig,
+  async (req, res) => {
+    if (
+      req.twitch.role !== "broadcaster" &&
+      req.twitch.role !== "moderator"
+    ) {
+      return res.status(403).json({
+        message:
+          "Forbidden: Only moderators or the broadcaster can view pending tasks.",
+      });
+    }
+
+    const { viewerDbId } = req.config;
+
+    try {
+      const response = await notion.databases.query({
+        database_id: viewerDbId,
+        filter: {
+          property: "Approval Status",
+          select: { equals: "Pending" },
+        },
+      });
+
+      const pendingTasks = response.results.map((page) => ({
+        id: page.id,
+        title: page.properties.Task?.title[0]?.plain_text || "Untitled Task",
+        submitter:
+          page.properties["Suggested by"]?.rich_text[0]?.plain_text ||
+          "Unknown",
+      }));
+
+      res.json(pendingTasks);
+    } catch (error) {
+      console.error("Error fetching pending tasks from Notion:", error);
+      res.status(500).json({ message: "Error fetching pending tasks." });
+    }
+  },
+);
+
+/**
  * POST /tasks - A viewer submits a new task.
  * @param {import('express').Request} req - The Express request object.
  * @param {import('express').Response} res - The Express response object.
@@ -357,89 +451,100 @@ app.post(
  * @param {import('express').Request} req - The Express request object.
  * @param {import('express').Response} res - The Express response object.
  */
-app.put("/tasks/:pageId/approve", verifyTwitchJWT, async (req, res) => {
-  // We get role from the JWT, which is secure
-  if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
-    return res
-      .status(403)
-      .send("Forbidden: Only moderators or the broadcaster can approve tasks.");
-  }
-  const { pageId } = req.params;
-  console.log(
-    `[EBS] Mod/Broadcaster is approving task with page ID: ${pageId}`,
-  );
-
-  try {
-    // Fetch the page to inspect the title before approving
-    const page = await notion.pages.retrieve({ page_id: pageId });
-    const title = page.properties.Task?.title[0]?.plain_text || "";
-    if (containsProhibited(title)) {
-      // Auto-reject prohibited content to avoid showing it even when a moderator attempts approval
-      await notion.pages.update({
-        page_id: pageId,
-        archived: true,
-        properties: { "Approval Status": { select: { name: "Rejected" } } },
-      });
-      console.warn(
-        `[EBS] Auto-rejected approval of prohibited task ${pageId}: ${title}`,
-      );
-      return res.status(400).json({
-        message:
-          "Task contains prohibited content and was rejected by the system.",
+app.put(
+  "/tasks/:pageId/approve",
+  modRateLimiter,
+  verifyTwitchJWT,
+  async (req, res) => {
+    // We get role from the JWT, which is secure
+    if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
+      return res.status(403).json({
+        message: "Forbidden: Only moderators or the broadcaster can approve tasks.",
       });
     }
+    const { pageId } = req.params;
+    console.log(
+      `[EBS] Mod/Broadcaster is approving task with page ID: ${pageId}`,
+    );
 
-    await notion.pages.update({
-      page_id: pageId,
-      properties: {
-        "Approval Status": { select: { name: "Approved" } },
-        Status: { status: { name: "Not started" } },
-      },
-    });
-    res.json({ message: "Task approved!" });
-  } catch (error) {
-    console.error("Error approving task in Notion:", error);
-    res.status(500).json({ message: "Error approving task." });
-  }
-});
+    try {
+      // Fetch the page to inspect the title before approving
+      const page = await notion.pages.retrieve({ page_id: pageId });
+      const title = page.properties.Task?.title[0]?.plain_text || "";
+      if (containsProhibited(title)) {
+        // Auto-reject prohibited content to avoid showing it even when a moderator attempts approval
+        await notion.pages.update({
+          page_id: pageId,
+          archived: true,
+          properties: { "Approval Status": { select: { name: "Rejected" } } },
+        });
+        console.warn(
+          `[EBS] Auto-rejected approval of prohibited task ${pageId}: ${title}`,
+        );
+        return res.status(400).json({
+          message:
+            "Task contains prohibited content and was rejected by the system.",
+        });
+      }
+
+      await notion.pages.update({
+        page_id: pageId,
+        properties: {
+          "Approval Status": { select: { name: "Approved" } },
+          Status: { status: { name: "Not started" } },
+        },
+      });
+      res.json({ message: "Task approved!" });
+    } catch (error) {
+      console.error("Error approving task in Notion:", error);
+      res.status(500).json({ message: "Error approving task." });
+    }
+  },
+);
 
 /**
  * PUT /tasks/:pageId/complete - Moderator/Broadcaster can mark a specific page as completed.
  * @param {import('express').Request} req - The Express request object.
  * @param {import('express').Response} res - The Express response object.
  */
-app.put("/tasks/:pageId/complete", verifyTwitchJWT, async (req, res) => {
-  const { pageId } = req.params;
-  const { completed } = req.body;
+app.put(
+  "/tasks/:pageId/complete",
+  modRateLimiter,
+  verifyTwitchJWT,
+  async (req, res) => {
+    const { pageId } = req.params;
+    const { completed } = req.body;
 
-  // Only broadcaster or moderator may mark arbitrary pages complete
-  if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
-    return res
-      .status(403)
-      .send(
-        "Forbidden: Only moderators or the broadcaster can mark tasks complete.",
-      );
-  }
+    // Only broadcaster or moderator may mark arbitrary pages complete
+    if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
+      return res.status(403).json({
+        message:
+          "Forbidden: Only moderators or the broadcaster can mark tasks complete.",
+      });
+    }
 
-  if (typeof completed !== "boolean") {
-    return res
-      .status(400)
-      .json({ message: "Request body must include boolean 'completed'." });
-  }
+    if (typeof completed !== "boolean") {
+      return res
+        .status(400)
+        .json({ message: "Request body must include boolean 'completed'." });
+    }
 
-  try {
-    await notion.pages.update({
-      page_id: pageId,
-      properties: { Completed: { checkbox: completed } },
-    });
-    res.json({
-      message: `Task ${pageId} marked as ${completed ? "completed" : "not completed"}.`,
-    });
-  } catch (error) {
-    console.error("Error updating task completion in Notion:", error);
-    res.status(500).json({ message: "Error updating task completion." });
-  }
-});
+    try {
+      await notion.pages.update({
+        page_id: pageId,
+        properties: { Completed: { checkbox: completed } },
+      });
+      res.json({
+        message: `Task ${pageId} marked as ${
+          completed ? "completed" : "not completed"
+        }.`,
+      });
+    } catch (error) {
+      console.error("Error updating task completion in Notion:", error);
+      res.status(500).json({ message: "Error updating task completion." });
+    }
+  },
+);
 
 /**
  * PUT /tasks/me/complete - A viewer can mark their own approved task as completed.

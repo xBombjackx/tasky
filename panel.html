@@ -1,0 +1,138 @@
+<!doctype html>
+<html class="dark" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Tasky - Viewer Panel</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#53a8b6",
+              "background-light": "#f6f5f8",
+              "background-dark": "#3a4f6a",
+              "text-light": "#bbe4e9",
+              "text-muted": "#79c2d0",
+              "border-color": "#5585b5",
+            },
+          },
+        },
+      };
+    </script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="themes.css" />
+    <script src="mock-twitch-ext.js"></script>
+  </head>
+  <body
+    class="bg-background-light dark:bg-background-dark font-display text-text-light p-8"
+  >
+    <div class="max-w-2xl mx-auto">
+      <h1 class="text-3xl font-bold mb-8">Submit a Task</h1>
+
+      <div
+        class="bg-background-dark/80 rounded-xl border border-border-color/50 p-6 mb-6"
+      >
+        <h2 class="text-xl font-semibold mb-4">New Task</h2>
+        <form id="task-form">
+          <div class="flex items-center space-x-4">
+            <input
+              type="text"
+              id="taskDescription"
+              class="w-full bg-background-light border-border-color/50 rounded-lg focus:ring-primary focus:border-primary text-gray-900 placeholder:text-gray-500"
+              placeholder="Enter your task suggestion..."
+              required
+            />
+            <button
+              type="submit"
+              id="submit-task"
+              class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/80 transition-colors whitespace-nowrap"
+            >
+              Submit
+            </button>
+          </div>
+        </form>
+        <p id="submit-status" class="text-sm mt-4"></p>
+      </div>
+    </div>
+
+    <script>
+      const twitch = window.Twitch.ext;
+      let authToken = null;
+
+      twitch.onContext((context, changed) => {
+        // console.log('onContext', context);
+      });
+
+      twitch.onAuthorized((auth) => {
+        // console.log('onAuthorized', auth);
+        authToken = auth.token;
+      });
+
+      const taskForm = document.getElementById('task-form');
+      const taskDescriptionInput = document.getElementById('taskDescription');
+      const submitStatus = document.getElementById('submit-status');
+
+      taskForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        submitTask();
+      });
+
+      function getEbsUrl() {
+        const url = new URL(window.location.href);
+        const isLocal = url.searchParams.get("local") === "true";
+        return isLocal
+          ? "http://localhost:8082"
+          : "https://your-production-ebs-url.com"; // Replace with your actual prod URL
+      }
+
+      async function submitTask() {
+        if (!authToken) {
+          submitStatus.textContent = 'Authentication not ready. Please wait.';
+          submitStatus.classList.add('text-red-500');
+          return;
+        }
+
+        const description = taskDescriptionInput.value;
+        if (!description.trim()) {
+          submitStatus.textContent = 'Task description cannot be empty.';
+          submitStatus.classList.add('text-red-500');
+          return;
+        }
+
+        const EBS_URL = getEbsUrl();
+
+        try {
+          const response = await fetch(`${EBS_URL}/tasks`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ taskDescription: description }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            submitStatus.textContent = result.message;
+            submitStatus.classList.remove('text-red-500');
+            submitStatus.classList.add('text-green-500');
+            taskDescriptionInput.value = '';
+          } else {
+            throw new Error(result.message || 'Failed to submit task.');
+          }
+        } catch (error) {
+          console.error('Error submitting task:', error);
+          submitStatus.textContent = `Error: ${error.message}`;
+          submitStatus.classList.add('text-red-500');
+        }
+      }
+    </script>
+  </body>
+</html>

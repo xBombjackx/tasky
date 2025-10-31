@@ -41,14 +41,14 @@ These tasks address items from the code review and should be completed before bu
 
 ## Phase 2: Viewer Submission & Moderation
 
-- [ ] **[NEW FILE]** Create `panel.html` to serve as the Twitch Extension Panel.
-- [ ] **[panel.html]** Implement the `twitch.onAuthorized` auth flow, similar to the overlay.
-- [ ] **[panel.html]** Build a simple form (e.g., "Task Title") for task submission.
-- [ ] **[panel.html]** Add JavaScript to `panel.html` to send the new task data to the `POST /tasks` endpoint, including the auth token.
-- [ ] **[NEW FILE]** Create `config.html` to serve as the Twitch Live Config Panel for moderators/streamers.
-- [ ] **[ebs.js]** Create a new endpoint, e.g., `GET /tasks/pending`, that fetches tasks from the Viewer Notion DB with the "Pending" status (requires `verifyTwitchJWT` and a role check for 'moderator' or 'broadcaster').
-- [ ] **[config.html]** Implement auth and fetch logic to call `GET /tasks/pending` and display the list of tasks awaiting approval.
-- [ ] **[config.html]** Add "Approve" and "Reject" buttons for each task, which call the existing `PUT /tasks/:pageId/approve` endpoint (or a new `DELETE /tasks/:pageId` endpoint for rejection).
+- [x] **[NEW FILE]** Create `panel.html` to serve as the Twitch Extension Panel.
+- [x] **[panel.html]** Implement the `twitch.onAuthorized` auth flow, similar to the overlay.
+- [x] **[panel.html]** Build a simple form (e.g., "Task Title") for task submission.
+- [x] **[panel.html]** Add JavaScript to `panel.html` to send the new task data to the `POST /tasks` endpoint, including the auth token.
+- [x] **[NEW FILE]** Create `config.html` to serve as the Twitch Live Config Panel for moderators/streamers.
+- [x] **[ebs.js]** Create a new endpoint, e.g., `GET /tasks/pending`, that fetches tasks from the Viewer Notion DB with the "Pending" status (requires `verifyTwitchJWT` and a role check for 'moderator' or 'broadcaster').
+- [x] **[config.html]** Implement auth and fetch logic to call `GET /tasks/pending` and display the list of tasks awaiting approval.
+- [x] **[config.html]** Add "Approve" and "Reject" buttons for each task, which call the existing `PUT /tasks/:pageId/approve` endpoint (or a new `DELETE /tasks/:pageId` endpoint for rejection).
 
 ## Phase 3: Task Lifecycle & Progress Rewards
 

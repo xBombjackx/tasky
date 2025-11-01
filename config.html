@@ -224,46 +224,68 @@
       }
 
       async function approveTask(pageId) {
-        // ----- MODIFICATION -----
-        if (!window.twitchAuth || !window.twitchAuth.token) return; // Use global auth token
-        // -------------------------
+        const statusEl = document.getElementById("moderation-status");
+        if (!window.twitchAuth || !window.twitchAuth.token) {
+          console.log("approveTask: Not authorized yet, waiting.");
+          statusEl.textContent = "Error: Not authorized. Please refresh.";
+          statusEl.className = "text-red-500 text-sm mt-4";
+          return;
+        }
+
         const EBS_URL = getEbsUrl();
         try {
           const response = await fetch(`${EBS_URL}/tasks/${pageId}/approve`, {
             method: "PUT",
             headers: {
-              // ----- MODIFICATION -----
-              Authorization: `Bearer ${window.twitchAuth.token}`, // Use global auth token
-              // -------------------------
+              Authorization: `Bearer ${window.twitchAuth.token}`,
             },
           });
+
           if (response.ok) {
+            statusEl.textContent = "Task approved successfully!";
+            statusEl.className = "text-green-500 text-sm mt-4";
             fetchPendingTasks(); // Refresh the list
+          } else {
+            const err = await response.json();
+            throw new Error(err.message || "Failed to approve task.");
           }
         } catch (error) {
           console.error("Error approving task:", error);
+          statusEl.textContent = `Error: ${error.message}`;
+          statusEl.className = "text-red-500 text-sm mt-4";
         }
       }
 
       async function rejectTask(pageId) {
-        // ----- MODIFICATION -----
-        if (!window.twitchAuth || !window.twitchAuth.token) return; // Use global auth token
-        // -------------------------
+        const statusEl = document.getElementById("moderation-status");
+        if (!window.twitchAuth || !window.twitchAuth.token) {
+          console.log("rejectTask: Not authorized yet, waiting.");
+          statusEl.textContent = "Error: Not authorized. Please refresh.";
+          statusEl.className = "text-red-500 text-sm mt-4";
+          return;
+        }
+
         const EBS_URL = getEbsUrl();
         try {
           const response = await fetch(`${EBS_URL}/tasks/${pageId}`, {
             method: "DELETE",
             headers: {
-              // ----- MODIFICATION -----
-              Authorization: `Bearer ${window.twitchAuth.token}`, // Use global auth token
-              // -------------------------
+              Authorization: `Bearer ${window.twitchAuth.token}`,
             },
           });
+
           if (response.ok) {
+            statusEl.textContent = "Task rejected successfully!";
+            statusEl.className = "text-green-500 text-sm mt-4";
             fetchPendingTasks(); // Refresh the list
+          } else {
+            const err = await response.json();
+            throw new Error(err.message || "Failed to reject task.");
           }
         } catch (error) {
           console.error("Error rejecting task:", error);
+          statusEl.textContent = `Error: ${error.message}`;
+          statusEl.className = "text-red-500 text-sm mt-4";
         }
       }
     </script>

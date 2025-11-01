@@ -1,4 +1,10 @@
 /**
+ * @fileoverview Configuration script for the Twitch Extension.
+ * This file handles the logic for the configuration page, including saving
+ * settings to the Twitch Configuration Service and setting up Notion databases.
+ */
+
+/**
  * Twitch Extension onAuthorized callback.
  * This function is called when the extension is authorized. It retrieves the
  * broadcaster's configuration, populates the form fields, and fetches pending tasks.
@@ -96,8 +102,11 @@ function createDatabases() {
   statusEl.textContent = "Creating databases, please wait...";
   statusEl.className = "text-sm mt-4 text-yellow-400";
 
-  const url = `http://localhost:8081/setup`;
-  fetch(url, {
+  const url = new URL(window.location.href);
+  const isLocal = url.searchParams.get("local") === "true";
+  const ebsUrl = isLocal ? "http://localhost:8081" : EBS_URL;
+
+  fetch(`${ebsUrl}/setup`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

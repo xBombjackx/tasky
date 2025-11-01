@@ -232,6 +232,7 @@ app.delete(
   "/tasks/:pageId",
   modRateLimiter,
   verifyTwitchJWT,
+  loadBroadcasterConfig,
   async (req, res) => {
     if (req.twitch.role !== "broadcaster" && req.twitch.role !== "moderator") {
       return res.status(403).json({
@@ -239,11 +240,24 @@ app.delete(
       });
     }
     const { pageId } = req.params;
-    console.log(
-      `[EBS] Mod/Broadcaster is rejecting task with page ID: ${pageId}`,
-    );
+    const { viewerDbId } = req.config;
 
     try {
+      // Security Check: Verify the page belongs to the broadcaster's database
+      const pageToUpdate = await notion.pages.retrieve({ page_id: pageId });
+      if (pageToUpdate.parent.database_id !== viewerDbId) {
+        console.warn(
+          `[SECURITY] Moderator ${req.twitch.opaque_user_id} from channel ${req.twitch.channel_id} attempted to reject a task (${pageId}) they do not own.`,
+        );
+        return res.status(403).json({
+          message: "Forbidden: You do not have permission to modify this task.",
+        });
+      }
+
+      console.log(
+        `[EBS] Mod/Broadcaster is rejecting task with page ID: ${pageId}`,
+      );
+
       await notion.pages.update({
         page_id: pageId,
         archived: true, // Archiving is a soft delete

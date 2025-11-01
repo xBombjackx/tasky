@@ -117,6 +117,7 @@
       <p id="moderation-status" class="text-sm mt-4"></p>
     </div>
 
+    <script src="shared-config.js"></script>
     <script src="config.js"></script>
     <script>
       // Additional script for moderation functionality
@@ -133,7 +134,7 @@
         const isLocal = url.searchParams.get("local") === "true";
         return isLocal
           ? "http://localhost:8082"
-          : "https://your-production-ebs-url.com"; // Replace with your actual prod URL
+          : EBS_URL;
       }
 
       async function fetchPendingTasks() {

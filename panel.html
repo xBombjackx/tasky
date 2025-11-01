@@ -28,6 +28,7 @@
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="themes.css" />
     <script src="mock-twitch-ext.js"></script>
+    <script src="shared-config.js"></script>
   </head>
   <body
     class="bg-background-light dark:bg-background-dark font-display text-text-light p-8"
@@ -88,7 +89,7 @@
         const isLocal = url.searchParams.get("local") === "true";
         return isLocal
           ? "http://localhost:8082"
-          : "https://your-production-ebs-url.com"; // Replace with your actual prod URL
+          : EBS_URL;
       }
 
       async function submitTask() {

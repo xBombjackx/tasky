@@ -213,8 +213,10 @@ app.put("/tasks/:pageId/approve", (req, res) => {
   const task = mockTasks.viewerTasks.find((t) => t.id === pageId);
   if (task) {
     task.status = "Approved";
+    res.status(200).json({ message: "Task approved!" });
+  } else {
+    res.status(404).json({ message: "Task not found" });
   }
-  res.status(200).json({ message: "Task approved!" });
 });
 
 /**

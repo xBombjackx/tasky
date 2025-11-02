@@ -1,3 +1,10 @@
+/**
+ * @fileoverview The main backend service for the Twitch Extension.
+ * This file sets up an Express server to handle API requests from the
+ * extension's frontend, interacts with the Notion API to manage tasks,
+ * and verifies Twitch JWTs for secure communication.
+ */
+
 // --- Core Dependencies ---
 require("dotenv").config();
 const express = require("express");

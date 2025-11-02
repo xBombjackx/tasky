@@ -1,4 +1,10 @@
-// mock-ebs.js
+/**
+ * @fileoverview A mock backend service for the Twitch Extension.
+ * This file sets up an Express server to simulate the behavior of the
+ * real EBS. It provides mock data and endpoints for local frontend
+ * development and testing, allowing developers to work on the UI
+ * without needing a live connection to the Notion API or Twitch services.
+ */
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");

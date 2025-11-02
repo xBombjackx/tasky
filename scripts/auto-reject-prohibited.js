@@ -1,3 +1,8 @@
+/**
+ * @fileoverview A script to find and automatically reject viewer-submitted tasks
+ * that contain prohibited content. This is a safety measure to prevent harmful
+ * content from appearing, even if a moderator accidentally approves it.
+ */
 require("dotenv").config();
 const { Client } = require("@notionhq/client");
 
@@ -23,6 +28,11 @@ const PROHIBITED_PATTERNS = [
   /go\s+die/i,
 ];
 
+/**
+ * Checks if a string contains prohibited content.
+ * @param {string} text - The text to check.
+ * @returns {boolean} True if the text contains prohibited content, false otherwise.
+ */
 function containsProhibited(text) {
   if (!text || typeof text !== "string") return false;
   for (const rx of PROHIBITED_PATTERNS) if (rx.test(text)) return true;

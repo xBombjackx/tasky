@@ -1,3 +1,8 @@
+/**
+ * @fileoverview A debug script to directly query the Notion API and fetch tasks,
+ * bypassing the EBS. This is useful for testing Notion API connectivity and
+ * inspecting the raw data returned from the databases.
+ */
 require("dotenv").config();
 const { Client } = require("@notionhq/client");
 
@@ -9,6 +14,11 @@ if (!NOTION_API_KEY) {
 }
 const notion = new Client({ auth: NOTION_API_KEY });
 
+/**
+ * Directly queries the Notion API for streamer and viewer tasks
+ * and logs the number of results and a sample of the first page from each.
+ * This is a debug script to test Notion connectivity and basic query functionality.
+ */
 async function run() {
   try {
     console.log("Querying streamer DB", STREAMER_DATABASE_ID);

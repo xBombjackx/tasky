@@ -1,3 +1,9 @@
+/**
+ * @fileoverview A one-time migration script to populate the "Approval Status"
+ * property in the viewer database. It infers the approval status from the
+ * existing "Status" property to ensure backward compatibility for tasks
+ * created before the moderation system was introduced.
+ */
 require("dotenv").config();
 const { Client } = require("@notionhq/client");
 
@@ -13,6 +19,12 @@ if (!VIEWER_DATABASE_ID) {
 
 const notion = new Client({ auth: NOTION_API_KEY });
 
+/**
+ * One-time script to backfill the "Approval Status" property for existing pages
+ * in the viewer database. It takes the value from the "Status" property if
+ * "Approval Status" is not set. This ensures older entries work with the new
+ * moderation system.
+ */
 async function run() {
   try {
     const resp = await notion.databases.query({

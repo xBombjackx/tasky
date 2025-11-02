@@ -1,5 +1,8 @@
-// Script: mark-my-task-complete.js
-// Sends PUT /tasks/me/complete to the local EBS using a generated Twitch extension JWT
+/**
+ * @fileoverview A test script to simulate a viewer marking their own task as complete.
+ * It generates a viewer JWT and sends a PUT request to the `/tasks/me/complete`
+ * endpoint of the local EBS.
+ */
 require("dotenv").config();
 const fetch = require("node-fetch");
 const jwt = require("jsonwebtoken");

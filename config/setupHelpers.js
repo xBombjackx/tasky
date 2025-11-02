@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Helper functions for setting up and validating Notion databases.
+ * This module provides functions to create, find, and validate the schemas
+ * of Notion databases used by the extension.
+ */
 const { STREAMER_SCHEMA, VIEWER_SCHEMA } = require("./databaseSchemas");
 
 /**
@@ -73,6 +78,13 @@ async function createDatabase(notion, schema, parentPageId) {
   }
 }
 
+/**
+ * Searches for a Notion database by its exact title.
+ * @param {object} notion - The Notion SDK client.
+ * @param {string} title - The exact title of the database to find.
+ * @returns {string|null} The ID of the found database, or null if not found.
+ * @throws {Error} If the Notion API search fails.
+ */
 async function findDatabaseByTitle(notion, title) {
   try {
     const response = await notion.search({

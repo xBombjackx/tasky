@@ -1,5 +1,9 @@
-// Script: test-put-page-complete.js
-// Sends PUT /tasks/:pageId/complete to the local EBS using a generated Twitch extension JWT
+/**
+ * @fileoverview A test script to mark a specific task as complete.
+ * It generates a moderator JWT and sends a PUT request to the
+ * `/tasks/:pageId/complete` endpoint of the local EBS, simulating a
+ * moderator action from the frontend.
+ */
 require("dotenv").config();
 const fetch = require("node-fetch");
 const jwt = require("jsonwebtoken");

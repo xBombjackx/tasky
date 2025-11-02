@@ -1,4 +1,8 @@
-// Small script to request GET /tasks from local EBS using a generated Twitch extension JWT
+/**
+ * @fileoverview A test script to request tasks from the local EBS.
+ * It generates a valid Twitch Extension JWT and sends an authenticated GET request
+ * to the `/tasks` endpoint, simulating a real frontend API call.
+ */
 require("dotenv").config();
 const fetch = require("node-fetch");
 const jwt = require("jsonwebtoken");

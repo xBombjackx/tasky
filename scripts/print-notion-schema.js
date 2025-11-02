@@ -1,4 +1,9 @@
-// One-off script to print Notion DB property names and types
+/**
+ * @fileoverview A utility script to print the schema of the Notion databases.
+ * It retrieves the properties of both the streamer and viewer databases and
+ * logs their names, types, and options, which is useful for debugging and
+ * understanding the database structure.
+ */
 require("dotenv").config();
 const { Client } = require("@notionhq/client");
 
@@ -19,6 +24,11 @@ if (!STREAMER_DATABASE_ID && !VIEWER_DATABASE_ID) {
 
 const notion = new Client({ auth: NOTION_API_KEY });
 
+/**
+ * Retrieves and prints the schema for a given Notion database.
+ * @param {string} id The ID of the Notion database.
+ * @param {string} label A human-readable label for the database, used in logging.
+ */
 async function printDb(id, label) {
   try {
     const db = await notion.databases.retrieve({ database_id: id });
@@ -53,6 +63,10 @@ async function printDb(id, label) {
   }
 }
 
+/**
+ * Main function to print the schemas for the Streamer and Viewer databases.
+ * It reads the database IDs from the environment variables.
+ */
 (async function main() {
   if (STREAMER_DATABASE_ID) {
     await printDb(STREAMER_DATABASE_ID, "Streamer DB");

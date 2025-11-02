@@ -1,4 +1,10 @@
-// mock-twitch-ext.js
+/**
+ * @fileoverview Mock implementation of the Twitch Extension Helper library.
+ * This file simulates the `window.Twitch.ext` object for local development
+ * and testing. It provides mock functions for authorization, configuration,
+ * and other Twitch services, allowing the frontend to run without being
+ * embedded in the actual Twitch platform.
+ */
 window.Twitch = {
   ext: {
     // --- Mock Configuration Service ---

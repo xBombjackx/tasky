@@ -1,8 +1,17 @@
+/**
+ * @fileoverview A debug script to check and print the current schema of the
+ * Streamer and Viewer Notion databases. This helps in verifying that the
+ * database structure matches the expected schema defined in the application.
+ */
 const { Client } = require("@notionhq/client");
 require("dotenv").config();
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
+/**
+ * Retrieves and logs the structure of the Streamer and Viewer databases.
+ * This is useful for debugging schema issues.
+ */
 async function checkDatabaseStructure() {
   try {
     console.log("Checking Streamer Database structure...");

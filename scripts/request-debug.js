@@ -1,3 +1,8 @@
+/**
+ * @fileoverview A simple script to test the `/tasks-local` debug endpoint.
+ * This script sends a GET request to the local EBS to fetch tasks without
+ * requiring a Twitch JWT, which is useful for quick, unauthenticated testing.
+ */
 const fetch = require("node-fetch");
 const PORT = process.env.PORT || 8081;
 

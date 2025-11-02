@@ -1,9 +1,13 @@
-// config.js
+/**
+ * @fileoverview Configuration script for the Twitch Extension.
+ * This file handles the logic for the configuration page, including saving
+ * settings to the Twitch Configuration Service and setting up Notion databases.
+ */
 
 /**
  * Twitch Extension onAuthorized callback.
  * This function is called when the extension is authorized. It retrieves the
- * broadcaster's configuration and populates the form fields with the stored values.
+ * broadcaster's configuration, populates the form fields, and fetches pending tasks.
  * @param {object} auth - The Twitch authentication object.
  * @param {string} auth.token - The JWT token for authentication with the EBS.
  */
@@ -29,6 +33,14 @@ window.Twitch.ext.onAuthorized(function (auth) {
   } catch (e) {
     console.error("Error parsing configuration:", e);
   }
+
+  // Fetch pending tasks now that we are authorized.
+  // This function is defined in the inline script on config.html
+  if (typeof fetchPendingTasks === "function") {
+    fetchPendingTasks();
+  } else {
+    console.error("fetchPendingTasks() function not found.");
+  }
 });
 
 /**
@@ -45,7 +57,7 @@ function saveConfiguration() {
     JSON.stringify({
       streamerDbId: streamerDbId,
       viewerDbId: viewerDbId,
-    })
+    }),
   );
 }
 
@@ -90,8 +102,11 @@ function createDatabases() {
   statusEl.textContent = "Creating databases, please wait...";
   statusEl.className = "text-sm mt-4 text-yellow-400";
 
-  const url = `http://localhost:8081/setup`;
-  fetch(url, {
+  const url = new URL(window.location.href);
+  const isLocal = url.searchParams.get("local") === "true";
+  const ebsUrl = isLocal ? "http://localhost:8081" : EBS_URL;
+
+  fetch(`${ebsUrl}/setup`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -109,7 +124,7 @@ function createDatabases() {
             throw new Error(err.message || "Setup failed with no error message.");
           })
           .catch(() => {
-            throw new Error(`Setup failed with status: ${response.status}`)
+            throw new Error(`Setup failed with status: ${response.status}`);
           });
       }
       return response.json();

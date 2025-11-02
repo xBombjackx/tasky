@@ -108,7 +108,7 @@ app.get("/mock-jwt", (req, res) => {
   if (!TWITCH_EXTENSION_SECRET) {
     return res
       .status(500)
-      .send("TWITCH_EXTENSION_SECRET is not set in .env file.");
+      .json({ message: "TWITCH_EXTENSION_SECRET is not set in .env file." });
   }
   const secret = Buffer.from(TWITCH_EXTENSION_SECRET, "base64");
   const payload = {
@@ -213,8 +213,10 @@ app.put("/tasks/:pageId/approve", (req, res) => {
   const task = mockTasks.viewerTasks.find((t) => t.id === pageId);
   if (task) {
     task.status = "Approved";
+    res.status(200).json({ message: "Task approved!" });
+  } else {
+    res.status(404).json({ message: "Task not found" });
   }
-  res.status(200).json({ message: "Task approved!" });
 });
 
 /**

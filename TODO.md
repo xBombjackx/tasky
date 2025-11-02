@@ -27,6 +27,12 @@ These tasks address items from the code review and should be completed before bu
 
 ## New Code Review Findings
 
+- [ ] **[EBS] Unused Functions**: The `ebs.js` file contains several unused helper functions (`approveViewerTask`, `rejectViewerTask`, `updateViewerTaskStatus`) that add clutter and could cause confusion. These should be removed.
+- [ ] **[EBS] Missing Ownership Validation on Approval**: The `PUT /tasks/:pageId/approve` endpoint lacks a crucial security check to verify that the task being approved belongs to the broadcaster's `viewerDbId`. This could allow a moderator from one channel to approve a task in another's database if they know the `pageId`.
+- [ ] **[Mock EBS] Inconsistent Rejection Logic**: The `DELETE /tasks/:pageId` endpoint in `mock-ebs.js` sets a task's status to `"Rejected"` but doesn't remove it from the list. This is inconsistent with the production EBS, which archives the page. The mock should be updated to filter out rejected tasks to better simulate the real backend.
+- [ ] **[Config Page] Race Condition in Auth Flow**: The `config.html` page has two `twitch.onAuthorized` handlers—one in `config.js` and one in the inline script. This can create race conditions. The logic should be consolidated into a single handler to ensure a predictable execution order.
+- [ ] **[Frontend] Multiple `getEbsUrl` Implementations**: The `getEbsUrl` function is defined independently in `code.html`, `panel.html`, and `config.html`. This duplicated code should be centralized into the `shared-config.js` file to avoid inconsistencies and improve maintainability.
+- [ ] **[Panel Page] Missing Twitch Helper Script**: The `panel.html` file includes `mock-twitch-ext.js` directly but lacks the conditional logic present in `code.html` to load the real `twitch-ext.min.js` when not in local testing mode. This means the panel will not function in a production environment.
 - [ ] **Docstrings:** Add JSDoc comments to all functions in `ebs.js`, `code.html`, `config.js`, and `mock-ebs.js` to improve code clarity and maintainability.
 - [x] **[config.js]** **Hardcoded URL:** The `createDatabases` function in `config.js` uses a hardcoded URL for the EBS. This should be updated to use a dynamic URL for production environments.
 - [ ] **[ebs.js]** **Inadequate Content Moderation:** The `containsProhibited` function provides a very basic level of content moderation. This should be expanded with a more robust list of patterns or integrated with a third-party moderation service to better protect streamers and viewers.
